@@ -347,14 +347,16 @@ export class GameEngine {
   }
 
   private resolveAxis(p: PlayerState, axis: "x" | "y") {
-    const left = p.x - PW / 2;
-    const right = p.x + PW / 2;
-    const top = p.y;
-    const bottom = p.y + PH;
+    const EPS = 0.6;
+    const left = p.x - PW / 2 + EPS;
+    const right = p.x + PW / 2 - EPS;
+    const top = p.y + EPS;
+    const bottom = p.y + PH - EPS;
     const c0 = Math.floor(left / TILE);
     const c1 = Math.floor(right / TILE);
     const r0 = Math.floor(top / TILE);
     const r1 = Math.floor(bottom / TILE);
+
 
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
