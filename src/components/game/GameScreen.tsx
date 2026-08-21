@@ -49,7 +49,7 @@ export function GameScreen({
       isHost,
       networked,
       onHud: setHud,
-      onNet: sendState,
+      onNet: sendState ?? (() => {}),
     });
     engineRef.current = engine;
     registerRemote?.((snap) => engine.applyRemote(snap));
