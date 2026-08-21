@@ -57,3 +57,18 @@ export const sfx = {
   },
   select: () => tone({ freq: 660, dur: 0.08, type: "square", vol: 0.06 }),
 };
+
+export const sfxExtra = {
+  pipe: () => {
+    tone({ freq: 700, dur: 0.18, sweep: 120, type: "square", vol: 0.09 });
+    tone({ freq: 300, dur: 0.22, sweep: 60, type: "square", vol: 0.07, delay: 0.12 });
+  },
+  secret: () => {
+    [392, 523, 659, 880, 1175].forEach((f, i) =>
+      tone({ freq: f, dur: 0.16, type: "triangle", vol: 0.09, delay: i * 0.1 }),
+    );
+  },
+  power: () => {
+    [523, 784, 1047].forEach((f, i) => tone({ freq: f, dur: 0.14, type: "square", vol: 0.08, delay: i * 0.08 }));
+  },
+};
