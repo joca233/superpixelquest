@@ -377,10 +377,12 @@ export class GameEngine {
       return;
     }
     if (p.invuln > 0) p.invuln--;
+    if (p.superJump > 0) p.superJump--;
 
     const left = this.pressed(p, "left");
     const right = this.pressed(p, "right");
     const jump = this.pressed(p, "jump");
+    const down = this.pressed(p, "down");
 
     if (left) {
       p.vx -= ACCEL;
@@ -395,7 +397,7 @@ export class GameEngine {
     if (Math.abs(p.vx) < 0.05) p.vx = 0;
 
     if (jump && p.onGround) {
-      p.vy = JUMP_V;
+      p.vy = p.superJump > 0 ? JUMP_V * 1.55 : JUMP_V;
       p.onGround = false;
       sfx.jump();
     }
@@ -405,8 +407,9 @@ export class GameEngine {
 
     // Horizontal
     p.x += p.vx;
-    if (p.x < 0) {
-      p.x = 0;
+    const minX = p.area === "under" ? p.room * ROOM_COLS * TILE : 0;
+    if (p.x < minX) {
+      p.x = minX;
       p.vx = 0;
     }
     this.resolveAxis(p, "x");
@@ -421,9 +424,14 @@ export class GameEngine {
     if (p.vx !== 0 && p.onGround) p.anim = (p.anim + Math.abs(p.vx) * 0.4) % 4;
     else if (!p.onGround) p.anim = 4;
 
-    if (p.y > LEVEL_ROWS * TILE + 80) this.killPlayer(p);
+    this.handleSecret(p, left, down);
 
-    if (!p.finished && p.x >= this.level.flagX - 6) {
+    if (p.area === "surface" && p.y > LEVEL_ROWS * TILE + 80) {
+      if (this.secretMode) this.enterRoom(p);
+      else this.killPlayer(p);
+    }
+
+    if (p.area === "surface" && !p.finished && p.x >= this.level.flagX - 6) {
       p.finished = true;
       p.score += 1000 + this.time * 10;
       this.status = "won";
@@ -431,6 +439,112 @@ export class GameEngine {
       this.saveHighScore(p.score);
     }
   }
+
+  /** Invisible wall push timer, secret reveal, and pipe transitions. */
+  private handleSecret(p: PlayerState, left: boolean, down: boolean) {
+    if (p.area === "surface" && !this.revealed) {
+      const atWall = left && p.vx === 0 && p.x - PW / 2 <= (WALL_COL + 1) * TILE + 3 && p.x > WALL_COL * TILE;
+      if (atWall) {
+        this.pushFrames++;
+        if (this.pushFrames >= 300) {
+          this.revealed = true;
+          this.showMessage("SEGREDO REVELADO! DESÇA NO CANO LARANJA");
+          sfxExtra.secret();
+        }
+      } else if (this.pushFrames > 0) {
+        this.pushFrames = Math.max(0, this.pushFrames - 3);
+      }
+    }
+
+    const tileUnder = this.g().get(Math.floor((p.y + PH + 4) / TILE), Math.floor(p.x / TILE));
+
+    if (down && p.onGround && p.area === "surface" && tileUnder === "O") {
+      if (!this.secretMode) {
+        this.secretMode = true;
+        this.showMessage("MODO SECRETO ATIVADO — OS BURACOS VIRAM SALAS!");
+        sfxExtra.secret();
+      }
+    }
+
+    if (down && p.onGround && p.area === "under" && tileUnder === "E") {
+      this.exitRoom(p);
+    }
+  }
+
+  private holeIndexAt(x: number) {
+    const col = Math.floor(x / TILE);
+    let best = -1;
+    this.level.holes.forEach((h, i) => {
+      if (col >= h.startCol - 2 && col <= h.endCol + 2) best = i;
+    });
+    if (best < 0) {
+      // fall back to nearest hole to the left
+      this.level.holes.forEach((h, i) => {
+        if (h.startCol <= col) best = i;
+      });
+    }
+    return Math.max(0, best);
+  }
+
+  private enterRoom(p: PlayerState) {
+    if (this.level.holes.length === 0) {
+      this.killPlayer(p);
+      return;
+    }
+    const i = this.holeIndexAt(p.x);
+    p.area = "under";
+    p.room = i;
+    p.x = (i * ROOM_COLS + 3) * TILE;
+    p.y = (ROOM_ROWS - 5) * TILE;
+    p.vx = 0;
+    p.vy = 0;
+    this.camX = i * ROOM_COLS * TILE;
+    sfxExtra.pipe();
+    this.grantReward(p, i);
+  }
+
+  private grantReward(p: PlayerState, i: number) {
+    const reward = ROOM_REWARDS[i % ROOM_REWARDS.length];
+    if (reward === "invencibilidade") {
+      p.invuln = 600;
+      this.setPower("INVENCÍVEL", 600);
+    } else if (reward === "superpulo") {
+      p.superJump = 900;
+      this.setPower("SUPER PULO", 900);
+    } else if (reward === "moedas") {
+      p.coins += 10;
+      p.score += 1000;
+      this.setPower("+10 MOEDAS", 240);
+    } else {
+      p.lives += 1;
+      this.setPower("+1 VIDA", 240);
+    }
+    this.showMessage(`SALA SECRETA — ITEM: ${reward.toUpperCase()}`);
+    this.spawnParticles(p.x, p.y, "#f5d442", 14);
+    sfxExtra.power();
+  }
+
+  private setPower(label: string, frames: number) {
+    this.power = label;
+    this.powerTimer = frames;
+  }
+
+  private showMessage(text: string) {
+    this.message = text;
+    this.messageTimer = 240;
+  }
+
+  private exitRoom(p: PlayerState) {
+    const hole = this.level.holes[p.room];
+    p.area = "surface";
+    p.x = ((hole?.endCol ?? START_COL) + 2) * TILE;
+    p.y = (LEVEL_ROWS - 5) * TILE;
+    p.vx = 0;
+    p.vy = 0;
+    this.camX = Math.max(this.revealed ? 0 : WALL_COL * TILE, p.x - this.opts.canvas.width / 2);
+    sfxExtra.pipe();
+  }
+
 
   private resolveAxis(p: PlayerState, axis: "x" | "y") {
     const EPS = 0.6;
