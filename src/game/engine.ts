@@ -39,10 +39,15 @@ export type PlayerState = {
   finished: boolean;
   scheme: ControlScheme;
   local: boolean;
+  // secret mode
+  area: "surface" | "under";
+  room: number;
+  superJump: number;
   // network interpolation targets
   tx: number;
   ty: number;
 };
+
 
 export type Enemy = { id: number; x: number; y: number; vx: number; alive: boolean };
 
