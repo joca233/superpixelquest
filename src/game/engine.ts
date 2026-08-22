@@ -1,5 +1,19 @@
-import { buildLevel, isSolid, LEVEL_COLS, LEVEL_ROWS, TILE, type LevelData } from "./level";
-import { sfx } from "./audio";
+import {
+  buildLevel,
+  isSolid,
+  LEVEL_COLS,
+  LEVEL_ROWS,
+  ROOM_COLS,
+  ROOM_ROWS,
+  ROOM_REWARDS,
+  START_COL,
+  TILE,
+  WALL_COL,
+  type Grid,
+  type LevelData,
+} from "./level";
+import { sfx, sfxExtra } from "./audio";
+
 
 export const PLAYER_COLORS = ["#e64539", "#3fd463", "#3a8ee6", "#f5d442"];
 export const PLAYER_NAMES = ["Jogador 1", "Jogador 2", "Jogador 3", "Jogador 4"];
