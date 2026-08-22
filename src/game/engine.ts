@@ -54,7 +54,12 @@ export type HudState = {
   lives: number;
   time: number;
   status: "playing" | "won" | "gameover";
+  secret: boolean;
+  power: string | null;
+  message: string | null;
+  pushPct: number;
 };
+
 
 export type NetSnapshot = {
   i: number;
