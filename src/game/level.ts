@@ -7,8 +7,8 @@ export const START_COL = SECRET_COLS + 2;
 export const LEVEL_COLS = 236;
 
 /** Underground bonus rooms (one per pit) live in their own grid. */
-export const ROOM_ROWS = 12;
-export const ROOM_COLS = 24;
+export const ROOM_ROWS = 16;
+export const ROOM_COLS = 30;
 
 export type TileChar = "." | "X" | "G" | "B" | "?" | "P" | "F" | "C" | "O" | "E" | "W" | "D" | "S";
 
