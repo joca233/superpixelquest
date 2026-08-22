@@ -106,7 +106,7 @@ export class GameEngine {
   private enemies: Enemy[] = [];
   private particles: Particle[] = [];
   private keys = new Set<string>();
-  private touch = { left: false, right: false, jump: false };
+  private touch = { left: false, right: false, jump: false, down: false };
   private raf = 0;
   private last = 0;
   private acc = 0;
@@ -117,6 +117,14 @@ export class GameEngine {
   private netAcc = 0;
   private bumps = new Map<number, number>();
   private destroyed = false;
+  // secret / easter egg state
+  private revealed = false;
+  private pushFrames = 0;
+  private secretMode = false;
+  private power: string | null = null;
+  private powerTimer = 0;
+  private message: string | null = null;
+  private messageTimer = 0;
 
   constructor(private opts: EngineOptions) {
     const ctx = opts.canvas.getContext("2d");
@@ -125,11 +133,12 @@ export class GameEngine {
     this.level = buildLevel(1337);
     this.enemies = this.level.enemies.map((e, id) => ({ id, x: e.x, y: e.y, vx: 1.1, alive: true }));
 
+    const spawnX = (START_COL + 1) * TILE;
     for (let i = 0; i < opts.playerCount; i++) {
       const local = opts.localIndices.includes(i);
       this.players.push({
         index: i,
-        x: 64 + i * 26,
+        x: spawnX + i * 26,
         y: (LEVEL_ROWS - 3) * TILE,
         vx: 0,
         vy: 0,
@@ -146,10 +155,15 @@ export class GameEngine {
         finished: false,
         scheme: opts.schemes[i] ?? "both",
         local,
-        tx: 64 + i * 26,
+        area: "surface",
+        room: 0,
+        superJump: 0,
+        tx: spawnX + i * 26,
         ty: (LEVEL_ROWS - 3) * TILE,
       });
     }
+    this.camX = WALL_COL * TILE;
+
 
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
