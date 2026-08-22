@@ -323,11 +323,28 @@ export class GameEngine {
       else this.bumps.set(k, v - 1);
     }
 
-    const cam = this.players.find((p) => p.local) ?? this.players[0];
+    if (this.powerTimer > 0) {
+      this.powerTimer--;
+      if (this.powerTimer === 0) this.power = null;
+    }
+    if (this.messageTimer > 0) {
+      this.messageTimer--;
+      if (this.messageTimer === 0) this.message = null;
+    }
+
+    const cam = this.me() ?? this.players[0];
     if (cam) {
-      const target = Math.max(0, Math.min(cam.x - this.opts.canvas.width / 2, LEVEL_COLS * TILE - this.opts.canvas.width));
+      const W = this.opts.canvas.width;
+      let min = this.revealed ? 0 : WALL_COL * TILE;
+      let max = LEVEL_COLS * TILE - W;
+      if (cam.area === "under") {
+        min = cam.room * ROOM_COLS * TILE;
+        max = min + ROOM_COLS * TILE - W;
+      }
+      const target = Math.max(min, Math.min(cam.x - W / 2, Math.max(min, max)));
       this.camX += (target - this.camX) * 0.12;
     }
+
 
     // network broadcast at ~20/s
     this.netAcc += 16.666;
