@@ -221,21 +221,50 @@ export class GameEngine {
     this.raf = requestAnimationFrame(this.loop);
   };
 
-  private pressed(p: PlayerState, action: "left" | "right" | "jump") {
+  private pressed(p: PlayerState, action: "left" | "right" | "jump" | "down") {
     const k = this.keys;
     const wasd =
-      action === "left" ? k.has("KeyA") : action === "right" ? k.has("KeyD") : k.has("Space") || k.has("KeyW");
+      action === "left"
+        ? k.has("KeyA")
+        : action === "right"
+          ? k.has("KeyD")
+          : action === "down"
+            ? k.has("KeyS")
+            : k.has("Space") || k.has("KeyW");
     const arrows =
       action === "left"
         ? k.has("ArrowLeft")
         : action === "right"
           ? k.has("ArrowRight")
-          : k.has("ArrowUp") || k.has("Enter");
+          : action === "down"
+            ? k.has("ArrowDown")
+            : k.has("ArrowUp") || k.has("Enter");
     let base = p.scheme === "wasd" ? wasd : p.scheme === "arrows" ? arrows : wasd || arrows;
     if (this.opts.localIndices[0] === p.index) {
-      base = base || (action === "left" ? this.touch.left : action === "right" ? this.touch.right : this.touch.jump);
+      base =
+        base ||
+        (action === "left"
+          ? this.touch.left
+          : action === "right"
+            ? this.touch.right
+            : action === "down"
+              ? this.touch.down
+              : this.touch.jump);
     }
     return base;
+  }
+
+  /** Grid currently used for collisions / rendering (surface level or bonus rooms). */
+  private g(): Grid {
+    return this.viewArea() === "under" ? this.level.rooms : this.level.grid;
+  }
+
+  private me(): PlayerState | undefined {
+    return this.players[this.opts.localIndices[0] ?? 0] ?? this.players[0];
+  }
+
+  private viewArea(): "surface" | "under" {
+    return this.me()?.area ?? "surface";
   }
 
   private solidAt(px: number, py: number) {
@@ -243,6 +272,7 @@ export class GameEngine {
     const r = Math.floor(py / TILE);
     return isSolid(this.level.grid.get(r, c));
   }
+
 
   private step() {
     if (this.status !== "playing") return;
