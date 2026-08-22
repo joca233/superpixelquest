@@ -1,5 +1,19 @@
-import { buildLevel, isSolid, LEVEL_COLS, LEVEL_ROWS, TILE, type LevelData } from "./level";
-import { sfx } from "./audio";
+import {
+  buildLevel,
+  isSolid,
+  LEVEL_COLS,
+  LEVEL_ROWS,
+  ROOM_COLS,
+  ROOM_ROWS,
+  ROOM_REWARDS,
+  START_COL,
+  TILE,
+  WALL_COL,
+  type Grid,
+  type LevelData,
+} from "./level";
+import { sfx, sfxExtra } from "./audio";
+
 
 export const PLAYER_COLORS = ["#e64539", "#3fd463", "#3a8ee6", "#f5d442"];
 export const PLAYER_NAMES = ["Jogador 1", "Jogador 2", "Jogador 3", "Jogador 4"];
@@ -25,10 +39,15 @@ export type PlayerState = {
   finished: boolean;
   scheme: ControlScheme;
   local: boolean;
+  // secret mode
+  area: "surface" | "under";
+  room: number;
+  superJump: number;
   // network interpolation targets
   tx: number;
   ty: number;
 };
+
 
 export type Enemy = { id: number; x: number; y: number; vx: number; alive: boolean };
 
@@ -40,7 +59,12 @@ export type HudState = {
   lives: number;
   time: number;
   status: "playing" | "won" | "gameover";
+  secret: boolean;
+  power: string | null;
+  message: string | null;
+  pushPct: number;
 };
+
 
 export type NetSnapshot = {
   i: number;
@@ -82,7 +106,7 @@ export class GameEngine {
   private enemies: Enemy[] = [];
   private particles: Particle[] = [];
   private keys = new Set<string>();
-  private touch = { left: false, right: false, jump: false };
+  private touch = { left: false, right: false, jump: false, down: false };
   private raf = 0;
   private last = 0;
   private acc = 0;
@@ -93,6 +117,14 @@ export class GameEngine {
   private netAcc = 0;
   private bumps = new Map<number, number>();
   private destroyed = false;
+  // secret / easter egg state
+  private revealed = false;
+  private pushFrames = 0;
+  private secretMode = false;
+  private power: string | null = null;
+  private powerTimer = 0;
+  private message: string | null = null;
+  private messageTimer = 0;
 
   constructor(private opts: EngineOptions) {
     const ctx = opts.canvas.getContext("2d");
@@ -101,11 +133,12 @@ export class GameEngine {
     this.level = buildLevel(1337);
     this.enemies = this.level.enemies.map((e, id) => ({ id, x: e.x, y: e.y, vx: 1.1, alive: true }));
 
+    const spawnX = (START_COL + 1) * TILE;
     for (let i = 0; i < opts.playerCount; i++) {
       const local = opts.localIndices.includes(i);
       this.players.push({
         index: i,
-        x: 64 + i * 26,
+        x: spawnX + i * 26,
         y: (LEVEL_ROWS - 3) * TILE,
         vx: 0,
         vy: 0,
@@ -122,10 +155,15 @@ export class GameEngine {
         finished: false,
         scheme: opts.schemes[i] ?? "both",
         local,
-        tx: 64 + i * 26,
+        area: "surface",
+        room: 0,
+        superJump: 0,
+        tx: spawnX + i * 26,
         ty: (LEVEL_ROWS - 3) * TILE,
       });
     }
+    this.camX = WALL_COL * TILE;
+
 
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
@@ -139,9 +177,10 @@ export class GameEngine {
     this.keys.delete(e.code);
   };
 
-  setTouch(t: Partial<{ left: boolean; right: boolean; jump: boolean }>) {
+  setTouch(t: Partial<{ left: boolean; right: boolean; jump: boolean; down: boolean }>) {
     Object.assign(this.touch, t);
   }
+
 
   applyRemote(snap: NetSnapshot) {
     const p = this.players[snap.i];
@@ -182,21 +221,50 @@ export class GameEngine {
     this.raf = requestAnimationFrame(this.loop);
   };
 
-  private pressed(p: PlayerState, action: "left" | "right" | "jump") {
+  private pressed(p: PlayerState, action: "left" | "right" | "jump" | "down") {
     const k = this.keys;
     const wasd =
-      action === "left" ? k.has("KeyA") : action === "right" ? k.has("KeyD") : k.has("Space") || k.has("KeyW");
+      action === "left"
+        ? k.has("KeyA")
+        : action === "right"
+          ? k.has("KeyD")
+          : action === "down"
+            ? k.has("KeyS")
+            : k.has("Space") || k.has("KeyW");
     const arrows =
       action === "left"
         ? k.has("ArrowLeft")
         : action === "right"
           ? k.has("ArrowRight")
-          : k.has("ArrowUp") || k.has("Enter");
+          : action === "down"
+            ? k.has("ArrowDown")
+            : k.has("ArrowUp") || k.has("Enter");
     let base = p.scheme === "wasd" ? wasd : p.scheme === "arrows" ? arrows : wasd || arrows;
     if (this.opts.localIndices[0] === p.index) {
-      base = base || (action === "left" ? this.touch.left : action === "right" ? this.touch.right : this.touch.jump);
+      base =
+        base ||
+        (action === "left"
+          ? this.touch.left
+          : action === "right"
+            ? this.touch.right
+            : action === "down"
+              ? this.touch.down
+              : this.touch.jump);
     }
     return base;
+  }
+
+  /** Grid currently used for collisions / rendering (surface level or bonus rooms). */
+  private g(): Grid {
+    return this.viewArea() === "under" ? this.level.rooms : this.level.grid;
+  }
+
+  private me(): PlayerState | undefined {
+    return this.players[this.opts.localIndices[0] ?? 0] ?? this.players[0];
+  }
+
+  private viewArea(): "surface" | "under" {
+    return this.me()?.area ?? "surface";
   }
 
   private solidAt(px: number, py: number) {
@@ -204,6 +272,7 @@ export class GameEngine {
     const r = Math.floor(py / TILE);
     return isSolid(this.level.grid.get(r, c));
   }
+
 
   private step() {
     if (this.status !== "playing") return;
@@ -238,7 +307,7 @@ export class GameEngine {
     }
 
     for (const p of this.players) {
-      if (p.local && p.alive && p.active) this.collideEnemies(p);
+      if (p.local && p.alive && p.active && p.area === "surface") this.collideEnemies(p);
     }
 
     for (const pt of this.particles) {
@@ -254,11 +323,28 @@ export class GameEngine {
       else this.bumps.set(k, v - 1);
     }
 
-    const cam = this.players.find((p) => p.local) ?? this.players[0];
+    if (this.powerTimer > 0) {
+      this.powerTimer--;
+      if (this.powerTimer === 0) this.power = null;
+    }
+    if (this.messageTimer > 0) {
+      this.messageTimer--;
+      if (this.messageTimer === 0) this.message = null;
+    }
+
+    const cam = this.me() ?? this.players[0];
     if (cam) {
-      const target = Math.max(0, Math.min(cam.x - this.opts.canvas.width / 2, LEVEL_COLS * TILE - this.opts.canvas.width));
+      const W = this.opts.canvas.width;
+      let min = this.revealed ? 0 : WALL_COL * TILE;
+      let max = LEVEL_COLS * TILE - W;
+      if (cam.area === "under") {
+        min = cam.room * ROOM_COLS * TILE;
+        max = min + ROOM_COLS * TILE - W;
+      }
+      const target = Math.max(min, Math.min(cam.x - W / 2, Math.max(min, max)));
       this.camX += (target - this.camX) * 0.12;
     }
+
 
     // network broadcast at ~20/s
     this.netAcc += 16.666;
@@ -291,10 +377,12 @@ export class GameEngine {
       return;
     }
     if (p.invuln > 0) p.invuln--;
+    if (p.superJump > 0) p.superJump--;
 
     const left = this.pressed(p, "left");
     const right = this.pressed(p, "right");
     const jump = this.pressed(p, "jump");
+    const down = this.pressed(p, "down");
 
     if (left) {
       p.vx -= ACCEL;
@@ -309,7 +397,7 @@ export class GameEngine {
     if (Math.abs(p.vx) < 0.05) p.vx = 0;
 
     if (jump && p.onGround) {
-      p.vy = JUMP_V;
+      p.vy = p.superJump > 0 ? JUMP_V * 1.55 : JUMP_V;
       p.onGround = false;
       sfx.jump();
     }
@@ -319,8 +407,9 @@ export class GameEngine {
 
     // Horizontal
     p.x += p.vx;
-    if (p.x < 0) {
-      p.x = 0;
+    const minX = p.area === "under" ? p.room * ROOM_COLS * TILE : 0;
+    if (p.x < minX) {
+      p.x = minX;
       p.vx = 0;
     }
     this.resolveAxis(p, "x");
@@ -335,9 +424,14 @@ export class GameEngine {
     if (p.vx !== 0 && p.onGround) p.anim = (p.anim + Math.abs(p.vx) * 0.4) % 4;
     else if (!p.onGround) p.anim = 4;
 
-    if (p.y > LEVEL_ROWS * TILE + 80) this.killPlayer(p);
+    this.handleSecret(p, left, down);
 
-    if (!p.finished && p.x >= this.level.flagX - 6) {
+    if (p.area === "surface" && p.y > LEVEL_ROWS * TILE + 80) {
+      if (this.secretMode) this.enterRoom(p);
+      else this.killPlayer(p);
+    }
+
+    if (p.area === "surface" && !p.finished && p.x >= this.level.flagX - 6) {
       p.finished = true;
       p.score += 1000 + this.time * 10;
       this.status = "won";
@@ -345,6 +439,112 @@ export class GameEngine {
       this.saveHighScore(p.score);
     }
   }
+
+  /** Invisible wall push timer, secret reveal, and pipe transitions. */
+  private handleSecret(p: PlayerState, left: boolean, down: boolean) {
+    if (p.area === "surface" && !this.revealed) {
+      const atWall = left && p.vx === 0 && p.x - PW / 2 <= (WALL_COL + 1) * TILE + 3 && p.x > WALL_COL * TILE;
+      if (atWall) {
+        this.pushFrames++;
+        if (this.pushFrames >= 300) {
+          this.revealed = true;
+          this.showMessage("SEGREDO REVELADO! DESÇA NO CANO LARANJA");
+          sfxExtra.secret();
+        }
+      } else if (this.pushFrames > 0) {
+        this.pushFrames = Math.max(0, this.pushFrames - 3);
+      }
+    }
+
+    const tileUnder = this.g().get(Math.floor((p.y + PH + 4) / TILE), Math.floor(p.x / TILE));
+
+    if (down && p.onGround && p.area === "surface" && tileUnder === "O") {
+      if (!this.secretMode) {
+        this.secretMode = true;
+        this.showMessage("MODO SECRETO ATIVADO — OS BURACOS VIRAM SALAS!");
+        sfxExtra.secret();
+      }
+    }
+
+    if (down && p.onGround && p.area === "under" && tileUnder === "E") {
+      this.exitRoom(p);
+    }
+  }
+
+  private holeIndexAt(x: number) {
+    const col = Math.floor(x / TILE);
+    let best = -1;
+    this.level.holes.forEach((h, i) => {
+      if (col >= h.startCol - 2 && col <= h.endCol + 2) best = i;
+    });
+    if (best < 0) {
+      // fall back to nearest hole to the left
+      this.level.holes.forEach((h, i) => {
+        if (h.startCol <= col) best = i;
+      });
+    }
+    return Math.max(0, best);
+  }
+
+  private enterRoom(p: PlayerState) {
+    if (this.level.holes.length === 0) {
+      this.killPlayer(p);
+      return;
+    }
+    const i = this.holeIndexAt(p.x);
+    p.area = "under";
+    p.room = i;
+    p.x = (i * ROOM_COLS + 3) * TILE;
+    p.y = (ROOM_ROWS - 5) * TILE;
+    p.vx = 0;
+    p.vy = 0;
+    this.camX = i * ROOM_COLS * TILE;
+    sfxExtra.pipe();
+    this.grantReward(p, i);
+  }
+
+  private grantReward(p: PlayerState, i: number) {
+    const reward = ROOM_REWARDS[i % ROOM_REWARDS.length] ?? "moedas";
+    if (reward === "invencibilidade") {
+      p.invuln = 600;
+      this.setPower("INVENCÍVEL", 600);
+    } else if (reward === "superpulo") {
+      p.superJump = 900;
+      this.setPower("SUPER PULO", 900);
+    } else if (reward === "moedas") {
+      p.coins += 10;
+      p.score += 1000;
+      this.setPower("+10 MOEDAS", 240);
+    } else {
+      p.lives += 1;
+      this.setPower("+1 VIDA", 240);
+    }
+    this.showMessage(`SALA SECRETA — ITEM: ${reward.toUpperCase()}`);
+    this.spawnParticles(p.x, p.y, "#f5d442", 14);
+    sfxExtra.power();
+  }
+
+  private setPower(label: string, frames: number) {
+    this.power = label;
+    this.powerTimer = frames;
+  }
+
+  private showMessage(text: string) {
+    this.message = text;
+    this.messageTimer = 240;
+  }
+
+  private exitRoom(p: PlayerState) {
+    const hole = this.level.holes[p.room];
+    p.area = "surface";
+    p.x = ((hole?.endCol ?? START_COL) + 2) * TILE;
+    p.y = (LEVEL_ROWS - 5) * TILE;
+    p.vx = 0;
+    p.vy = 0;
+    this.camX = Math.max(this.revealed ? 0 : WALL_COL * TILE, p.x - this.opts.canvas.width / 2);
+    sfxExtra.pipe();
+  }
+
 
   private resolveAxis(p: PlayerState, axis: "x" | "y") {
     const EPS = 0.6;
@@ -360,7 +560,7 @@ export class GameEngine {
 
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
-        const ch = this.level.grid.get(r, c);
+        const ch = this.g().get(r, c);
         if (!isSolid(ch)) continue;
         if (ch === "P" && axis === "y" && p.vy < 0) continue; // one-way platform
         if (ch === "P" && axis === "x") continue;
@@ -386,17 +586,17 @@ export class GameEngine {
   }
 
   private hitBlockFromBelow(p: PlayerState, r: number, c: number) {
-    const ch = this.level.grid.get(r, c);
+    const ch = this.g().get(r, c);
     const key = r * LEVEL_COLS + c;
     if (ch === "?") {
-      this.level.grid.set(r, c, "X");
+      this.g().set(r, c, "X");
       p.coins++;
       p.score += 200;
       this.bumps.set(key, 10);
       this.spawnParticles(c * TILE + 16, r * TILE, "#f5d442", 6);
       sfx.coin();
     } else if (ch === "B") {
-      this.level.grid.set(r, c, ".");
+      this.g().set(r, c, ".");
       p.score += 50;
       this.spawnParticles(c * TILE + 16, r * TILE + 16, "#b45f2e", 10);
       sfx.brick();
@@ -413,8 +613,8 @@ export class GameEngine {
     const r1 = Math.floor((p.y + PH) / TILE);
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
-        if (this.level.grid.get(r, c) === "C") {
-          this.level.grid.set(r, c, ".");
+        if (this.g().get(r, c) === "C") {
+          this.g().set(r, c, ".");
           p.coins++;
           p.score += 100;
           this.spawnParticles(c * TILE + 16, r * TILE + 16, "#f5d442", 5);
@@ -458,7 +658,8 @@ export class GameEngine {
   private respawn(p: PlayerState) {
     if (p.lives <= 0) return;
     p.alive = true;
-    p.x = Math.max(64, this.camX + 80);
+    p.area = "surface";
+    p.x = Math.max((START_COL + 1) * TILE, this.camX + 80);
     p.y = 0;
     p.vx = 0;
     p.vy = 0;
@@ -496,6 +697,10 @@ export class GameEngine {
       lives: Math.max(0, p?.lives ?? 0),
       time: this.time,
       status: this.status,
+      secret: this.secretMode,
+      power: this.power,
+      message: this.message,
+      pushPct: this.revealed ? 1 : Math.min(1, this.pushFrames / 300),
     });
   }
 
@@ -508,26 +713,36 @@ export class GameEngine {
     const ctx = this.ctx;
     const { width: W, height: H } = this.opts.canvas;
     ctx.imageSmoothingEnabled = false;
+    const under = this.viewArea() === "under";
 
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#3aa5f0");
-    sky.addColorStop(1, "#9fd8ff");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    this.drawClouds(W, H);
-    this.drawHills(W, H);
+    if (under) {
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, "#0b0d1c");
+      bg.addColorStop(1, "#171a33");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, "#3aa5f0");
+      sky.addColorStop(1, "#9fd8ff");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+      this.drawClouds(W, H);
+      this.drawHills(W, H);
+    }
 
     ctx.save();
     ctx.translate(-Math.round(this.camX), 0);
 
+    const grid = this.g();
+    const rows = under ? ROOM_ROWS : LEVEL_ROWS;
     const c0 = Math.max(0, Math.floor(this.camX / TILE) - 1);
-    const c1 = Math.min(LEVEL_COLS - 1, Math.floor((this.camX + W) / TILE) + 1);
+    const c1 = Math.min(grid.cols - 1, Math.floor((this.camX + W) / TILE) + 1);
 
-    for (let r = 0; r < LEVEL_ROWS; r++) {
+    for (let r = 0; r < rows; r++) {
       for (let c = c0; c <= c1; c++) {
-        const ch = this.level.grid.get(r, c);
-        if (ch === ".") continue;
+        const ch = grid.get(r, c);
+        if (ch === "." || ch === "W") continue;
         const bump = this.bumps.get(r * LEVEL_COLS + c) ?? 0;
         const x = c * TILE;
         const y = r * TILE - (bump > 0 ? Math.sin((bump / 10) * Math.PI) * 8 : 0);
@@ -535,8 +750,14 @@ export class GameEngine {
       }
     }
 
-    for (const e of this.enemies) if (e.alive) this.drawEnemy(e);
-    for (const p of this.players) if (p.active) this.drawPlayer(p);
+    if (!under) {
+      for (const e of this.enemies) if (e.alive) this.drawEnemy(e);
+    }
+    for (const p of this.players) {
+      if (!p.active) continue;
+      if (p.local ? p.area !== this.viewArea() : under) continue;
+      this.drawPlayer(p);
+    }
 
     for (const pt of this.particles) {
       ctx.fillStyle = pt.color;
@@ -545,6 +766,7 @@ export class GameEngine {
 
     ctx.restore();
   }
+
 
   private drawClouds(W: number, H: number) {
     const ctx = this.ctx;
