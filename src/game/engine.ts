@@ -307,7 +307,7 @@ export class GameEngine {
     }
 
     for (const p of this.players) {
-      if (p.local && p.alive && p.active) this.collideEnemies(p);
+      if (p.local && p.alive && p.active && p.area === "surface") this.collideEnemies(p);
     }
 
     for (const pt of this.particles) {
@@ -504,7 +504,7 @@ export class GameEngine {
   }
 
   private grantReward(p: PlayerState, i: number) {
-    const reward = ROOM_REWARDS[i % ROOM_REWARDS.length];
+    const reward = ROOM_REWARDS[i % ROOM_REWARDS.length] ?? "moedas";
     if (reward === "invencibilidade") {
       p.invuln = 600;
       this.setPower("INVENCÍVEL", 600);
@@ -560,7 +560,7 @@ export class GameEngine {
 
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
-        const ch = this.level.grid.get(r, c);
+        const ch = this.g().get(r, c);
         if (!isSolid(ch)) continue;
         if (ch === "P" && axis === "y" && p.vy < 0) continue; // one-way platform
         if (ch === "P" && axis === "x") continue;
@@ -586,17 +586,17 @@ export class GameEngine {
   }
 
   private hitBlockFromBelow(p: PlayerState, r: number, c: number) {
-    const ch = this.level.grid.get(r, c);
+    const ch = this.g().get(r, c);
     const key = r * LEVEL_COLS + c;
     if (ch === "?") {
-      this.level.grid.set(r, c, "X");
+      this.g().set(r, c, "X");
       p.coins++;
       p.score += 200;
       this.bumps.set(key, 10);
       this.spawnParticles(c * TILE + 16, r * TILE, "#f5d442", 6);
       sfx.coin();
     } else if (ch === "B") {
-      this.level.grid.set(r, c, ".");
+      this.g().set(r, c, ".");
       p.score += 50;
       this.spawnParticles(c * TILE + 16, r * TILE + 16, "#b45f2e", 10);
       sfx.brick();
@@ -613,8 +613,8 @@ export class GameEngine {
     const r1 = Math.floor((p.y + PH) / TILE);
     for (let r = r0; r <= r1; r++) {
       for (let c = c0; c <= c1; c++) {
-        if (this.level.grid.get(r, c) === "C") {
-          this.level.grid.set(r, c, ".");
+        if (this.g().get(r, c) === "C") {
+          this.g().set(r, c, ".");
           p.coins++;
           p.score += 100;
           this.spawnParticles(c * TILE + 16, r * TILE + 16, "#f5d442", 5);
@@ -658,7 +658,8 @@ export class GameEngine {
   private respawn(p: PlayerState) {
     if (p.lives <= 0) return;
     p.alive = true;
-    p.x = Math.max(64, this.camX + 80);
+    p.area = "surface";
+    p.x = Math.max((START_COL + 1) * TILE, this.camX + 80);
     p.y = 0;
     p.vx = 0;
     p.vy = 0;
@@ -696,6 +697,10 @@ export class GameEngine {
       lives: Math.max(0, p?.lives ?? 0),
       time: this.time,
       status: this.status,
+      secret: this.secretMode,
+      power: this.power,
+      message: this.message,
+      pushPct: this.revealed ? 1 : Math.min(1, this.pushFrames / 300),
     });
   }
 
