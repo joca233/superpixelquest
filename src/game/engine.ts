@@ -177,9 +177,10 @@ export class GameEngine {
     this.keys.delete(e.code);
   };
 
-  setTouch(t: Partial<{ left: boolean; right: boolean; jump: boolean }>) {
+  setTouch(t: Partial<{ left: boolean; right: boolean; jump: boolean; down: boolean }>) {
     Object.assign(this.touch, t);
   }
+
 
   applyRemote(snap: NetSnapshot) {
     const p = this.players[snap.i];
