@@ -713,26 +713,36 @@ export class GameEngine {
     const ctx = this.ctx;
     const { width: W, height: H } = this.opts.canvas;
     ctx.imageSmoothingEnabled = false;
+    const under = this.viewArea() === "under";
 
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "#3aa5f0");
-    sky.addColorStop(1, "#9fd8ff");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    this.drawClouds(W, H);
-    this.drawHills(W, H);
+    if (under) {
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, "#0b0d1c");
+      bg.addColorStop(1, "#171a33");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      const sky = ctx.createLinearGradient(0, 0, 0, H);
+      sky.addColorStop(0, "#3aa5f0");
+      sky.addColorStop(1, "#9fd8ff");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, W, H);
+      this.drawClouds(W, H);
+      this.drawHills(W, H);
+    }
 
     ctx.save();
     ctx.translate(-Math.round(this.camX), 0);
 
+    const grid = this.g();
+    const rows = under ? ROOM_ROWS : LEVEL_ROWS;
     const c0 = Math.max(0, Math.floor(this.camX / TILE) - 1);
-    const c1 = Math.min(LEVEL_COLS - 1, Math.floor((this.camX + W) / TILE) + 1);
+    const c1 = Math.min(grid.cols - 1, Math.floor((this.camX + W) / TILE) + 1);
 
-    for (let r = 0; r < LEVEL_ROWS; r++) {
+    for (let r = 0; r < rows; r++) {
       for (let c = c0; c <= c1; c++) {
-        const ch = this.level.grid.get(r, c);
-        if (ch === ".") continue;
+        const ch = grid.get(r, c);
+        if (ch === "." || ch === "W") continue;
         const bump = this.bumps.get(r * LEVEL_COLS + c) ?? 0;
         const x = c * TILE;
         const y = r * TILE - (bump > 0 ? Math.sin((bump / 10) * Math.PI) * 8 : 0);
@@ -740,8 +750,14 @@ export class GameEngine {
       }
     }
 
-    for (const e of this.enemies) if (e.alive) this.drawEnemy(e);
-    for (const p of this.players) if (p.active) this.drawPlayer(p);
+    if (!under) {
+      for (const e of this.enemies) if (e.alive) this.drawEnemy(e);
+    }
+    for (const p of this.players) {
+      if (!p.active) continue;
+      if (p.local ? p.area !== this.viewArea() : under) continue;
+      this.drawPlayer(p);
+    }
 
     for (const pt of this.particles) {
       ctx.fillStyle = pt.color;
@@ -750,6 +766,7 @@ export class GameEngine {
 
     ctx.restore();
   }
+
 
   private drawClouds(W: number, H: number) {
     const ctx = this.ctx;
