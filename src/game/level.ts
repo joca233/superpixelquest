@@ -127,7 +127,6 @@ export function buildLevel(seed = 1337): LevelData {
   const secretPipeCol = 4;
   for (const c of [secretPipeCol, secretPipeCol + 1]) {
     grid.set(groundTop - 1, c, "O");
-    grid.set(groundTop - 2, c, "O");
   }
   for (let r = 0; r <= groundTop - 1; r++) grid.set(r, WALL_COL, "W");
 
