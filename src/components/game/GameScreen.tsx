@@ -62,7 +62,6 @@ export function GameScreen({
       onNet: sendState ?? (() => {}),
     });
     engineRef.current = engine;
-    (window as unknown as { __pq?: unknown }).__pq = engine;
     registerRemote?.((snap) => engine.applyRemote(snap));
     engine.start();
     return () => {
