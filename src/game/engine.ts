@@ -448,6 +448,9 @@ export class GameEngine {
         this.pushFrames++;
         if (this.pushFrames >= 300) {
           this.revealed = true;
+          for (let r = 0; r < LEVEL_ROWS; r++) {
+            if (this.level.grid.get(r, WALL_COL) === "W") this.level.grid.set(r, WALL_COL, ".");
+          }
           this.showMessage("SEGREDO REVELADO! DESÇA NO CANO LARANJA");
           sfxExtra.secret();
         }
@@ -456,7 +459,13 @@ export class GameEngine {
       }
     }
 
-    const tileUnder = this.g().get(Math.floor((p.y + PH + 4) / TILE), Math.floor(p.x / TILE));
+    const footRow = Math.floor((p.y + PH + 4) / TILE);
+    const feet = [
+      this.g().get(footRow, Math.floor(p.x / TILE)),
+      this.g().get(footRow, Math.floor((p.x - PW / 2) / TILE)),
+      this.g().get(footRow, Math.floor((p.x + PW / 2) / TILE)),
+    ];
+    const tileUnder = feet.includes("O") ? "O" : feet.includes("E") ? "E" : feet[0];
 
     if (down && p.onGround && p.area === "surface" && tileUnder === "O") {
       if (!this.secretMode) {
@@ -853,8 +862,29 @@ export class GameEngine {
       ctx.fill();
       ctx.fillStyle = "#333";
       ctx.fillRect(x + 8, y + TILE - 6, 16, 6);
+    } else if (ch === "O" || ch === "E") {
+      const body = ch === "O" ? "#e8862a" : "#2fae5a";
+      const dark = ch === "O" ? "#a95a12" : "#1d7a3c";
+      ctx.fillStyle = body;
+      ctx.fillRect(x, y, TILE, TILE);
+      ctx.fillStyle = dark;
+      ctx.fillRect(x + TILE - 6, y, 6, TILE);
+      ctx.fillRect(x, y, TILE, 3);
+      ctx.fillStyle = "#ffd9a8";
+      ctx.fillRect(x + 3, y + 4, 4, TILE - 8);
+    } else if (ch === "D") {
+      ctx.fillStyle = "#2a2f52";
+      ctx.fillRect(x, y, TILE, TILE);
+      ctx.fillStyle = "#1b1f3a";
+      ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 6);
+    } else if (ch === "S") {
+      ctx.fillStyle = "#4a5188";
+      ctx.fillRect(x, y, TILE, 8);
+      ctx.fillStyle = "#2a2f52";
+      ctx.fillRect(x, y + 8, TILE, TILE - 8);
     }
   }
+
 
   private drawEnemy(e: Enemy) {
     const ctx = this.ctx;

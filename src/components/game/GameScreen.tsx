@@ -30,7 +30,17 @@ export function GameScreen({
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<GameEngine | null>(null);
-  const [hud, setHud] = useState<HudState>({ score: 0, coins: 0, lives: 3, time: 300, status: "playing" });
+  const [hud, setHud] = useState<HudState>({
+    score: 0,
+    coins: 0,
+    lives: 3,
+    time: 300,
+    status: "playing",
+    secret: false,
+    power: null,
+    message: null,
+    pushPct: 0,
+  });
   const [highScore, setHighScore] = useState(0);
   const [muted, setMutedState] = useState(false);
   const [runId, setRunId] = useState(0);
@@ -69,7 +79,7 @@ export function GameScreen({
     }
   }, [hud.status]);
 
-  const touch = (key: "left" | "right" | "jump", value: boolean) => {
+  const touch = (key: "left" | "right" | "jump" | "down", value: boolean) => {
     engineRef.current?.setTouch({ [key]: value });
   };
 
@@ -89,10 +99,29 @@ export function GameScreen({
           <Stat label="VIDAS" value={"♥".repeat(Math.max(0, hud.lives)) || "—"} />
           <Stat label="TEMPO" value={String(hud.time).padStart(3, "0")} />
           <Stat label="RECORDE" value={String(highScore).padStart(6, "0")} />
+          {(hud.secret || hud.power) && (
+            <Stat label={hud.secret ? "MODO SECRETO" : "ITEM"} value={hud.power ?? "ATIVO"} accent />
+          )}
         </div>
 
         <div className="scanlines pixel-frame relative overflow-hidden rounded-sm bg-sky">
           <canvas ref={canvasRef} className="block h-auto w-full" style={{ imageRendering: "pixelated" }} />
+
+          {hud.pushPct > 0 && hud.pushPct < 1 && (
+            <div className="absolute left-1/2 top-3 w-40 -translate-x-1/2">
+              <div className="h-2 w-full border-2 border-foreground bg-background">
+                <div className="h-full bg-accent" style={{ width: `${Math.round(hud.pushPct * 100)}%` }} />
+              </div>
+            </div>
+          )}
+
+          {hud.message && (
+            <div className="absolute inset-x-0 top-10 px-3 text-center">
+              <span className="inline-block bg-background/85 px-3 py-2 font-display text-[8px] leading-relaxed text-accent sm:text-[10px]">
+                {hud.message}
+              </span>
+            </div>
+          )}
 
           {hud.status !== "playing" && (
             <div className="absolute inset-0 grid place-items-center bg-background/85 p-4 text-center">
@@ -165,12 +194,13 @@ export function GameScreen({
           <div className="flex gap-3">
             <TouchBtn label="◀" onDown={() => touch("left", true)} onUp={() => touch("left", false)} />
             <TouchBtn label="▶" onDown={() => touch("right", true)} onUp={() => touch("right", false)} />
+            <TouchBtn label="▼" onDown={() => touch("down", true)} onUp={() => touch("down", false)} />
           </div>
           <TouchBtn label="A" big onDown={() => touch("jump", true)} onUp={() => touch("jump", false)} />
         </div>
 
         <p className="mt-4 hidden font-display text-[8px] leading-relaxed text-muted-foreground md:block">
-          A/D ou ◀ ▶ para mover · ESPAÇO / ▲ para pular
+          A/D ou ◀ ▶ para mover · ESPAÇO / ▲ para pular · S / ▼ para descer no cano
         </p>
       </div>
     </div>
