@@ -457,8 +457,10 @@ export class GameEngine {
 
     if (p.area === "surface" && p.y > LEVEL_ROWS * TILE + 80) {
       if (this.secretMode) this.enterRoom(p);
+      else if (this.godMode.has(p.index)) this.respawn(p);
       else this.killPlayer(p);
     }
+
 
     if (p.area === "surface" && !p.finished && p.x >= this.level.flagX - 6) {
       p.finished = true;
