@@ -117,6 +117,11 @@ export class GameEngine {
   private netAcc = 0;
   private bumps = new Map<number, number>();
   private destroyed = false;
+  // chat / commands
+  private inputLocked = false;
+  private bubbles = new Map<number, { text: string; until: number }>();
+  private godMode = new Set<number>();
+
   // secret / easter egg state
   private revealed = false;
   private pushFrames = 0;
@@ -170,6 +175,7 @@ export class GameEngine {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (this.inputLocked) return;
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
     this.keys.add(e.code);
   };
@@ -180,6 +186,27 @@ export class GameEngine {
   setTouch(t: Partial<{ left: boolean; right: boolean; jump: boolean; down: boolean }>) {
     Object.assign(this.touch, t);
   }
+
+  /** Freeze local movement while the chat box is open. */
+  setInputLocked(locked: boolean) {
+    this.inputLocked = locked;
+    if (locked) {
+      this.keys.clear();
+      this.touch.left = this.touch.right = this.touch.jump = this.touch.down = false;
+    }
+  }
+
+  /** Show a chat bubble above a player for a few seconds. */
+  setChatBubble(index: number, text: string) {
+    this.bubbles.set(index, { text: text.slice(0, 48), until: performance.now() + 5000 });
+  }
+
+  /** Permanent invincibility granted by the /invencibilidade infinita command. */
+  setGodMode(index: number, on: boolean) {
+    if (on) this.godMode.add(index);
+    else this.godMode.delete(index);
+  }
+
 
 
   applyRemote(snap: NetSnapshot) {
@@ -222,7 +249,9 @@ export class GameEngine {
   };
 
   private pressed(p: PlayerState, action: "left" | "right" | "jump" | "down") {
+    if (this.inputLocked && p.local) return false;
     const k = this.keys;
+
     const wasd =
       action === "left"
         ? k.has("KeyA")
@@ -428,8 +457,10 @@ export class GameEngine {
 
     if (p.area === "surface" && p.y > LEVEL_ROWS * TILE + 80) {
       if (this.secretMode) this.enterRoom(p);
+      else if (this.godMode.has(p.index)) this.respawn(p);
       else this.killPlayer(p);
     }
+
 
     if (p.area === "surface" && !p.finished && p.x >= this.level.flagX - 6) {
       p.finished = true;
@@ -653,6 +684,8 @@ export class GameEngine {
 
   private killPlayer(p: PlayerState | undefined) {
     if (!p || !p.alive) return;
+    if (this.godMode.has(p.index)) return;
+
     p.alive = false;
     p.vy = -8;
     p.lives -= 1;
@@ -907,8 +940,10 @@ export class GameEngine {
   private drawPlayer(p: PlayerState) {
     const ctx = this.ctx;
     if (!p.alive && p.lives <= 0) return;
-    if (p.invuln > 0 && Math.floor(p.invuln / 4) % 2 === 0) return;
+    const god = this.godMode.has(p.index);
+    if (!god && p.invuln > 0 && Math.floor(p.invuln / 4) % 2 === 0) return;
     const color = PLAYER_COLORS[p.index % 4] ?? "#e64539";
+
     const x = Math.round(p.x - PW / 2);
     const y = Math.round(p.y);
     const step = Math.floor(p.anim) % 4;
@@ -944,5 +979,40 @@ export class GameEngine {
       ctx.fillStyle = color;
       ctx.fillRect(x + 8, y - 10, 6, 5);
     }
+
+    // shimmering aura for permanent invincibility
+    if (god) {
+      const t = performance.now() / 90;
+      ctx.strokeStyle = `hsl(${Math.floor(t * 8) % 360} 100% 65%)`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - 3, y - 3, PW + 6, PH + 6);
+      for (let i = 0; i < 4; i++) {
+        const a = t * 0.6 + (i * Math.PI) / 2;
+        ctx.fillStyle = "#fff3a8";
+        ctx.fillRect(Math.round(x + 10 + Math.cos(a) * 20), Math.round(y + 14 + Math.sin(a) * 20), 3, 3);
+      }
+    }
+
+    // chat bubble
+    const bubble = this.bubbles.get(p.index);
+    if (bubble) {
+      if (performance.now() > bubble.until) {
+        this.bubbles.delete(p.index);
+      } else {
+        ctx.font = "10px monospace";
+        ctx.textBaseline = "top";
+        const w = Math.ceil(ctx.measureText(bubble.text).width) + 10;
+        const bx = Math.round(x + PW / 2 - w / 2);
+        const by = y - 30;
+        ctx.fillStyle = "rgba(12,12,20,0.88)";
+        ctx.fillRect(bx, by, w, 16);
+        ctx.fillStyle = color;
+        ctx.fillRect(bx, by, w, 2);
+        ctx.fillRect(bx + w / 2 - 3, by + 16, 6, 4);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(bubble.text, bx + 5, by + 3);
+      }
+    }
   }
 }
+
