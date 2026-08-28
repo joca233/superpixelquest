@@ -175,6 +175,7 @@ export class GameEngine {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (this.inputLocked) return;
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space"].includes(e.code)) e.preventDefault();
     this.keys.add(e.code);
   };
@@ -185,6 +186,27 @@ export class GameEngine {
   setTouch(t: Partial<{ left: boolean; right: boolean; jump: boolean; down: boolean }>) {
     Object.assign(this.touch, t);
   }
+
+  /** Freeze local movement while the chat box is open. */
+  setInputLocked(locked: boolean) {
+    this.inputLocked = locked;
+    if (locked) {
+      this.keys.clear();
+      this.touch.left = this.touch.right = this.touch.jump = this.touch.down = false;
+    }
+  }
+
+  /** Show a chat bubble above a player for a few seconds. */
+  setChatBubble(index: number, text: string) {
+    this.bubbles.set(index, { text: text.slice(0, 48), until: performance.now() + 5000 });
+  }
+
+  /** Permanent invincibility granted by the /invencibilidade infinita command. */
+  setGodMode(index: number, on: boolean) {
+    if (on) this.godMode.add(index);
+    else this.godMode.delete(index);
+  }
+
 
 
   applyRemote(snap: NetSnapshot) {
