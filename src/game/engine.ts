@@ -684,6 +684,8 @@ export class GameEngine {
 
   private killPlayer(p: PlayerState | undefined) {
     if (!p || !p.alive) return;
+    if (this.godMode.has(p.index)) return;
+
     p.alive = false;
     p.vy = -8;
     p.lives -= 1;
