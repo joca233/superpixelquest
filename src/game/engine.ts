@@ -249,7 +249,9 @@ export class GameEngine {
   };
 
   private pressed(p: PlayerState, action: "left" | "right" | "jump" | "down") {
+    if (this.inputLocked && p.local) return false;
     const k = this.keys;
+
     const wasd =
       action === "left"
         ? k.has("KeyA")
