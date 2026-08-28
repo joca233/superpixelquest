@@ -979,5 +979,40 @@ export class GameEngine {
       ctx.fillStyle = color;
       ctx.fillRect(x + 8, y - 10, 6, 5);
     }
+
+    // shimmering aura for permanent invincibility
+    if (god) {
+      const t = performance.now() / 90;
+      ctx.strokeStyle = `hsl(${Math.floor(t * 8) % 360} 100% 65%)`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x - 3, y - 3, PW + 6, PH + 6);
+      for (let i = 0; i < 4; i++) {
+        const a = t * 0.6 + (i * Math.PI) / 2;
+        ctx.fillStyle = "#fff3a8";
+        ctx.fillRect(Math.round(x + 10 + Math.cos(a) * 20), Math.round(y + 14 + Math.sin(a) * 20), 3, 3);
+      }
+    }
+
+    // chat bubble
+    const bubble = this.bubbles.get(p.index);
+    if (bubble) {
+      if (performance.now() > bubble.until) {
+        this.bubbles.delete(p.index);
+      } else {
+        ctx.font = "10px monospace";
+        ctx.textBaseline = "top";
+        const w = Math.ceil(ctx.measureText(bubble.text).width) + 10;
+        const bx = Math.round(x + PW / 2 - w / 2);
+        const by = y - 30;
+        ctx.fillStyle = "rgba(12,12,20,0.88)";
+        ctx.fillRect(bx, by, w, 16);
+        ctx.fillStyle = color;
+        ctx.fillRect(bx, by, w, 2);
+        ctx.fillRect(bx + w / 2 - 3, by + 16, 6, 4);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(bubble.text, bx + 5, by + 3);
+      }
+    }
   }
 }
+
