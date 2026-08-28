@@ -5,6 +5,16 @@ import type { NetSnapshot } from "@/game/engine";
 
 export type RoomPlayer = { id: string; name: string; joinedAt: number; slot: number };
 
+export type ChatMessage = {
+  id: string;
+  from: string;
+  slot: number;
+  name: string;
+  text: string;
+  ts: number;
+  system?: boolean;
+};
+
 export function makeRoomCode() {
   return Math.random().toString(36).slice(2, 6).toUpperCase();
 }
@@ -15,14 +25,17 @@ export function useRoom(roomCode: string | null, playerName: string) {
   const [players, setPlayers] = useState<RoomPlayer[]>([]);
   const [connected, setConnected] = useState(false);
   const [started, setStarted] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const joinedAtRef = useRef<number>(Date.now());
   const remoteHandler = useRef<((s: NetSnapshot) => void) | null>(null);
+  const chatHandler = useRef<((m: ChatMessage) => void) | null>(null);
 
   useEffect(() => {
     if (!roomCode) return;
     setStarted(false);
     setConnected(false);
+    setMessages([]);
     joinedAtRef.current = Date.now();
 
     const channel = supabase.channel(`sala-${roomCode}`, {
@@ -46,6 +59,11 @@ export function useRoom(roomCode: string | null, playerName: string) {
     channel.on("broadcast", { event: "start" }, () => setStarted(true));
     channel.on("broadcast", { event: "state" }, ({ payload }) => {
       remoteHandler.current?.(payload as NetSnapshot);
+    });
+    channel.on("broadcast", { event: "chat" }, ({ payload }) => {
+      const msg = payload as ChatMessage;
+      setMessages((prev) => [...prev.slice(-49), msg]);
+      chatHandler.current?.(msg);
     });
 
     void channel.subscribe(async (status) => {
@@ -77,5 +95,65 @@ export function useRoom(roomCode: string | null, playerName: string) {
     remoteHandler.current = fn;
   }, []);
 
-  return { players, me, isHost, connected, started, startGame, sendState, onRemoteState, clientId };
+  const onChatMessage = useCallback((fn: (m: ChatMessage) => void) => {
+    chatHandler.current = fn;
+  }, []);
+
+  const slotRef = useRef(0);
+  slotRef.current = me?.slot ?? 0;
+
+  const pushLocal = useCallback((msg: ChatMessage) => {
+    setMessages((prev) => [...prev.slice(-49), msg]);
+  }, []);
+
+  const sendChat = useCallback(
+    (text: string) => {
+      const msg: ChatMessage = {
+        id: `${clientId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        from: clientId,
+        slot: slotRef.current,
+        name: `Jogador ${slotRef.current + 1}`,
+        text,
+        ts: Date.now(),
+      };
+      pushLocal(msg);
+      void channelRef.current?.send({ type: "broadcast", event: "chat", payload: msg });
+      return msg;
+    },
+    [pushLocal],
+  );
+
+  const addSystemMessage = useCallback(
+    (text: string) => {
+      pushLocal({
+        id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        from: "system",
+        slot: slotRef.current,
+        name: "SISTEMA",
+        text,
+        ts: Date.now(),
+        system: true,
+      });
+    },
+    [pushLocal],
+  );
+
+  const getChannel = useCallback(() => channelRef.current, []);
+
+  return {
+    players,
+    me,
+    isHost,
+    connected,
+    started,
+    startGame,
+    sendState,
+    onRemoteState,
+    clientId,
+    messages,
+    sendChat,
+    onChatMessage,
+    addSystemMessage,
+    getChannel,
+  };
 }
