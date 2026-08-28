@@ -117,6 +117,11 @@ export class GameEngine {
   private netAcc = 0;
   private bumps = new Map<number, number>();
   private destroyed = false;
+  // chat / commands
+  private inputLocked = false;
+  private bubbles = new Map<number, { text: string; until: number }>();
+  private godMode = new Set<number>();
+
   // secret / easter egg state
   private revealed = false;
   private pushFrames = 0;
