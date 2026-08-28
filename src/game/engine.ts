@@ -940,8 +940,10 @@ export class GameEngine {
   private drawPlayer(p: PlayerState) {
     const ctx = this.ctx;
     if (!p.alive && p.lives <= 0) return;
-    if (p.invuln > 0 && Math.floor(p.invuln / 4) % 2 === 0) return;
+    const god = this.godMode.has(p.index);
+    if (!god && p.invuln > 0 && Math.floor(p.invuln / 4) % 2 === 0) return;
     const color = PLAYER_COLORS[p.index % 4] ?? "#e64539";
+
     const x = Math.round(p.x - PW / 2);
     const y = Math.round(p.y);
     const step = Math.floor(p.anim) % 4;
