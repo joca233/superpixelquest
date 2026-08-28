@@ -1,6 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GameEngine, PLAYER_COLORS, type ControlScheme, type HudState, type NetSnapshot } from "@/game/engine";
 import { sfx, setMuted, isMuted } from "@/game/audio";
+import { ChatPanel } from "@/components/game/ChatPanel";
+import type { ChatMessage } from "@/hooks/useRoom";
+
+export type ChatApi = {
+  messages: ChatMessage[];
+  mySlot: number;
+  sendChat: (text: string) => ChatMessage;
+  onChatMessage: (fn: (m: ChatMessage) => void) => void;
+  addSystemMessage: (text: string) => void;
+  toggleVoice: () => Promise<boolean>;
+  voiceEnabled: boolean;
+  voiceError: string | null;
+};
+
+const GOD_COMMAND = "/invencibilidade infinita";
 
 type Props = {
   playerCount: number;
@@ -10,12 +25,14 @@ type Props = {
   isHost?: boolean;
   sendState?: (s: NetSnapshot) => void;
   registerRemote?: (fn: (s: NetSnapshot) => void) => void;
+  chat?: ChatApi;
   onExit: () => void;
   title: string;
 };
 
 const CANVAS_W = 960;
 const CANVAS_H = 512;
+
 
 export function GameScreen({
   playerCount,
