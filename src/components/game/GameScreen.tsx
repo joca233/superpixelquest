@@ -108,6 +108,90 @@ export function GameScreen({
     setMutedState(next);
   };
 
+  /* ---------------- Chat (WiFi mode only) ---------------- */
+  const [chatOpen, setChatOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const chatRef = useRef(chat);
+  chatRef.current = chat;
+
+  useEffect(() => {
+    engineRef.current?.setInputLocked(chatOpen);
+  }, [chatOpen, runId]);
+
+  // Incoming messages: bubble over the sender, plus remote god-mode sync.
+  useEffect(() => {
+    if (!chat) return;
+    chat.onChatMessage((m) => {
+      if (m.text.toLowerCase().startsWith(GOD_COMMAND)) {
+        engineRef.current?.setGodMode(m.slot, true);
+        engineRef.current?.setChatBubble(m.slot, "✦ INVENCÍVEL ✦");
+      } else {
+        engineRef.current?.setChatBubble(m.slot, m.text);
+      }
+    });
+  }, [chat]);
+
+  // "T" opens the chat, "ESC" closes it.
+  useEffect(() => {
+    if (!chat) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (chatOpen) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setChatOpen(false);
+          setDraft("");
+        }
+        return;
+      }
+      if (e.key === "t" || e.key === "T") {
+        e.preventDefault();
+        setChatOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [chat, chatOpen]);
+
+  const submitChat = useCallback(async () => {
+    const api = chatRef.current;
+    const text = draft.trim();
+    setDraft("");
+    if (!api || !text) {
+      setChatOpen(false);
+      return;
+    }
+    const lower = text.toLowerCase();
+
+    if (lower === "/voicechat") {
+      const on = await api.toggleVoice();
+      api.addSystemMessage(
+        on ? "Chat de voz ATIVADO — fale com a sala." : (api.voiceError ?? "Chat de voz DESATIVADO."),
+      );
+      setChatOpen(false);
+      return;
+    }
+
+    if (lower === GOD_COMMAND) {
+      engineRef.current?.setGodMode(api.mySlot, true);
+      engineRef.current?.setChatBubble(api.mySlot, "✦ INVENCÍVEL ✦");
+      api.sendChat(GOD_COMMAND);
+      api.addSystemMessage("Invencibilidade infinita ativada!");
+      setChatOpen(false);
+      return;
+    }
+
+    if (lower.startsWith("/")) {
+      api.addSystemMessage("Comando desconhecido. Tente /voicechat ou /invencibilidade infinita");
+      setChatOpen(false);
+      return;
+    }
+
+    api.sendChat(text);
+    engineRef.current?.setChatBubble(api.mySlot, text);
+    setChatOpen(false);
+  }, [draft]);
+
+
   return (
     <div className="min-h-screen bg-background px-2 py-3 sm:px-4 sm:py-6">
       <div className="mx-auto w-full max-w-5xl">
