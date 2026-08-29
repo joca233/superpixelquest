@@ -255,7 +255,23 @@ export function GameScreen({
               </div>
             </div>
           )}
+
+          {chat && (
+            <ChatPanel
+              messages={chat.messages}
+              open={chatOpen}
+              draft={draft}
+              onDraft={setDraft}
+              onSubmit={() => void submitChat()}
+              onClose={() => {
+                setChatOpen(false);
+                setDraft("");
+              }}
+              voiceEnabled={chat.voiceEnabled}
+            />
+          )}
         </div>
+
 
         {/* Controls bar */}
         <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
