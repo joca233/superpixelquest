@@ -43,6 +43,8 @@ function Index() {
   }, []);
 
   const room = useRoom(screen === "lobby" || screen === "net" ? roomCode : null, "Jogador");
+  const voice = useVoiceChat(room.getChannel, room.clientId);
+
 
   useEffect(() => {
     if (room.started && screen === "lobby") setScreen("net");
