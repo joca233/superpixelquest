@@ -4,7 +4,9 @@ import { MainMenu } from "@/components/game/MainMenu";
 import { GameScreen } from "@/components/game/GameScreen";
 import { Lobby } from "@/components/game/Lobby";
 import { makeRoomCode, useRoom } from "@/hooks/useRoom";
+import { useVoiceChat } from "@/hooks/useVoiceChat";
 import type { ControlScheme } from "@/game/engine";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
