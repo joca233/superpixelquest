@@ -42,9 +42,11 @@ export function GameScreen({
   isHost = false,
   sendState,
   registerRemote,
+  chat,
   onExit,
   title,
 }: Props) {
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>({
