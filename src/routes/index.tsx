@@ -128,6 +128,17 @@ function Index() {
         isHost={room.isHost}
         sendState={room.sendState}
         registerRemote={room.onRemoteState}
+        chat={{
+          messages: room.messages,
+          mySlot: slot,
+          sendChat: room.sendChat,
+          onChatMessage: room.onChatMessage,
+          addSystemMessage: room.addSystemMessage,
+          toggleVoice: voice.toggleVoice,
+          voiceEnabled: voice.voiceEnabled,
+          voiceError: voice.voiceError,
+        }}
+
         onExit={backToMenu}
         title={`SALA ${roomCode} · VOCÊ É O JOGADOR ${slot + 1}`}
       />
