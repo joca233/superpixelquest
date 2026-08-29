@@ -315,13 +315,25 @@ export function GameScreen({
             <TouchBtn label="▶" onDown={() => touch("right", true)} onUp={() => touch("right", false)} />
             <TouchBtn label="▼" onDown={() => touch("down", true)} onUp={() => touch("down", false)} />
           </div>
-          <TouchBtn label="A" big onDown={() => touch("jump", true)} onUp={() => touch("jump", false)} />
+          <div className="flex items-end gap-3">
+            {chat && (
+              <button
+                onClick={() => setChatOpen((v) => !v)}
+                className="pixel-btn h-16 w-16 select-none rounded-sm bg-accent font-display text-[9px] text-accent-foreground"
+              >
+                CHAT
+              </button>
+            )}
+            <TouchBtn label="A" big onDown={() => touch("jump", true)} onUp={() => touch("jump", false)} />
+          </div>
         </div>
 
         <p className="mt-4 hidden font-display text-[8px] leading-relaxed text-muted-foreground md:block">
           A/D ou ◀ ▶ para mover · ESPAÇO / ▲ para pular · S / ▼ para descer no cano
+          {chat ? " · T para abrir o chat (/voicechat · /invencibilidade infinita)" : ""}
         </p>
       </div>
+
     </div>
   );
 }
