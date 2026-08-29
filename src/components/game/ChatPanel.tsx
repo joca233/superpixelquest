@@ -24,7 +24,9 @@ export function ChatPanel({ messages, open, draft, onDraft, onSubmit, onClose, v
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [messages]);
 
-  const recent = messages.slice(-6);
+  // Slash commands are broadcast for sync but stay out of the visible log.
+  const recent = messages.filter((m) => m.system || !m.text.startsWith("/")).slice(-6);
+
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2 sm:p-3">

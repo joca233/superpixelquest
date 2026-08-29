@@ -4,7 +4,9 @@ import { MainMenu } from "@/components/game/MainMenu";
 import { GameScreen } from "@/components/game/GameScreen";
 import { Lobby } from "@/components/game/Lobby";
 import { makeRoomCode, useRoom } from "@/hooks/useRoom";
+import { useVoiceChat } from "@/hooks/useVoiceChat";
 import type { ControlScheme } from "@/game/engine";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -41,6 +43,8 @@ function Index() {
   }, []);
 
   const room = useRoom(screen === "lobby" || screen === "net" ? roomCode : null, "Jogador");
+  const voice = useVoiceChat(room.getChannel, room.clientId);
+
 
   useEffect(() => {
     if (room.started && screen === "lobby") setScreen("net");
@@ -124,6 +128,17 @@ function Index() {
         isHost={room.isHost}
         sendState={room.sendState}
         registerRemote={room.onRemoteState}
+        chat={{
+          messages: room.messages,
+          mySlot: slot,
+          sendChat: room.sendChat,
+          onChatMessage: room.onChatMessage,
+          addSystemMessage: room.addSystemMessage,
+          toggleVoice: voice.toggleVoice,
+          voiceEnabled: voice.voiceEnabled,
+          voiceError: voice.voiceError,
+        }}
+
         onExit={backToMenu}
         title={`SALA ${roomCode} · VOCÊ É O JOGADOR ${slot + 1}`}
       />

@@ -42,9 +42,11 @@ export function GameScreen({
   isHost = false,
   sendState,
   registerRemote,
+  chat,
   onExit,
   title,
 }: Props) {
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>({
@@ -105,6 +107,90 @@ export function GameScreen({
     setMuted(next);
     setMutedState(next);
   };
+
+  /* ---------------- Chat (WiFi mode only) ---------------- */
+  const [chatOpen, setChatOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const chatRef = useRef(chat);
+  chatRef.current = chat;
+
+  useEffect(() => {
+    engineRef.current?.setInputLocked(chatOpen);
+  }, [chatOpen, runId]);
+
+  // Incoming messages: bubble over the sender, plus remote god-mode sync.
+  useEffect(() => {
+    if (!chat) return;
+    chat.onChatMessage((m) => {
+      if (m.text.toLowerCase().startsWith(GOD_COMMAND)) {
+        engineRef.current?.setGodMode(m.slot, true);
+        engineRef.current?.setChatBubble(m.slot, "✦ INVENCÍVEL ✦");
+      } else {
+        engineRef.current?.setChatBubble(m.slot, m.text);
+      }
+    });
+  }, [chat]);
+
+  // "T" opens the chat, "ESC" closes it.
+  useEffect(() => {
+    if (!chat) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (chatOpen) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          setChatOpen(false);
+          setDraft("");
+        }
+        return;
+      }
+      if (e.key === "t" || e.key === "T") {
+        e.preventDefault();
+        setChatOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [chat, chatOpen]);
+
+  const submitChat = useCallback(async () => {
+    const api = chatRef.current;
+    const text = draft.trim();
+    setDraft("");
+    if (!api || !text) {
+      setChatOpen(false);
+      return;
+    }
+    const lower = text.toLowerCase();
+
+    if (lower === "/voicechat") {
+      const on = await api.toggleVoice();
+      api.addSystemMessage(
+        on ? "Chat de voz ATIVADO — fale com a sala." : (api.voiceError ?? "Chat de voz DESATIVADO."),
+      );
+      setChatOpen(false);
+      return;
+    }
+
+    if (lower === GOD_COMMAND) {
+      engineRef.current?.setGodMode(api.mySlot, true);
+      engineRef.current?.setChatBubble(api.mySlot, "✦ INVENCÍVEL ✦");
+      api.sendChat(GOD_COMMAND);
+      api.addSystemMessage("Invencibilidade infinita ativada!");
+      setChatOpen(false);
+      return;
+    }
+
+    if (lower.startsWith("/")) {
+      api.addSystemMessage("Comando desconhecido. Tente /voicechat ou /invencibilidade infinita");
+      setChatOpen(false);
+      return;
+    }
+
+    api.sendChat(text);
+    engineRef.current?.setChatBubble(api.mySlot, text);
+    setChatOpen(false);
+  }, [draft]);
+
 
   return (
     <div className="min-h-screen bg-background px-2 py-3 sm:px-4 sm:py-6">
@@ -169,7 +255,23 @@ export function GameScreen({
               </div>
             </div>
           )}
+
+          {chat && (
+            <ChatPanel
+              messages={chat.messages}
+              open={chatOpen}
+              draft={draft}
+              onDraft={setDraft}
+              onSubmit={() => void submitChat()}
+              onClose={() => {
+                setChatOpen(false);
+                setDraft("");
+              }}
+              voiceEnabled={chat.voiceEnabled}
+            />
+          )}
         </div>
+
 
         {/* Controls bar */}
         <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
@@ -213,13 +315,25 @@ export function GameScreen({
             <TouchBtn label="▶" onDown={() => touch("right", true)} onUp={() => touch("right", false)} />
             <TouchBtn label="▼" onDown={() => touch("down", true)} onUp={() => touch("down", false)} />
           </div>
-          <TouchBtn label="A" big onDown={() => touch("jump", true)} onUp={() => touch("jump", false)} />
+          <div className="flex items-end gap-3">
+            {chat && (
+              <button
+                onClick={() => setChatOpen((v) => !v)}
+                className="pixel-btn h-16 w-16 select-none rounded-sm bg-accent font-display text-[9px] text-accent-foreground"
+              >
+                CHAT
+              </button>
+            )}
+            <TouchBtn label="A" big onDown={() => touch("jump", true)} onUp={() => touch("jump", false)} />
+          </div>
         </div>
 
         <p className="mt-4 hidden font-display text-[8px] leading-relaxed text-muted-foreground md:block">
           A/D ou ◀ ▶ para mover · ESPAÇO / ▲ para pular · S / ▼ para descer no cano
+          {chat ? " · T para abrir o chat (/voicechat · /invencibilidade infinita)" : ""}
         </p>
       </div>
+
     </div>
   );
 }
