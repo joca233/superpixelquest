@@ -43,6 +43,9 @@ export type PlayerState = {
   area: "surface" | "under";
   room: number;
   superJump: number;
+  // speed boots power-up
+  boots: number;
+  autoRun: boolean;
   // network interpolation targets
   tx: number;
   ty: number;
@@ -63,6 +66,9 @@ export type HudState = {
   power: string | null;
   message: string | null;
   pushPct: number;
+  boots: number;
+  sonic: number;
+  ending: "none" | "sonic";
 };
 
 
@@ -131,6 +137,14 @@ export class GameEngine {
   private message: string | null = null;
   private messageTimer = 0;
 
+  // speed boots / sonic ending
+  private bootsItems: { x: number; y: number; vx: number; vy: number; alive: boolean }[] = [];
+  private disguised = false;
+  private sonicMode = false;
+  private sonicX = 0;
+  private sonic = 0;
+  private ending: "none" | "sonic" = "none";
+
   constructor(private opts: EngineOptions) {
     const ctx = opts.canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D indisponível");
@@ -163,6 +177,8 @@ export class GameEngine {
         area: "surface",
         room: 0,
         superJump: 0,
+        boots: 0,
+        autoRun: false,
         tx: spawnX + i * 26,
         ty: (LEVEL_ROWS - 3) * TILE,
       });
@@ -339,6 +355,8 @@ export class GameEngine {
       if (p.local && p.alive && p.active && p.area === "surface") this.collideEnemies(p);
     }
 
+    this.stepBoots();
+
     for (const pt of this.particles) {
       pt.x += pt.vx;
       pt.y += pt.vy;
@@ -359,6 +377,11 @@ export class GameEngine {
     if (this.messageTimer > 0) {
       this.messageTimer--;
       if (this.messageTimer === 0) this.message = null;
+    }
+
+    if (this.sonicMode) {
+      this.sonic = Math.min(1, this.sonic + 0.004);
+      this.sonicX += 26;
     }
 
     const cam = this.me() ?? this.players[0];
@@ -628,6 +651,14 @@ export class GameEngine {
   private hitBlockFromBelow(p: PlayerState, r: number, c: number) {
     const ch = this.g().get(r, c);
     const key = r * LEVEL_COLS + c;
+    if (ch === "H") {
+      this.g().set(r, c, "X");
+      this.bumps.set(key, 10);
+      this.bootsItems.push({ x: c * TILE + 4, y: r * TILE - TILE, vx: 1.4, vy: 0, alive: true });
+      this.showMessage("BOTAS DE VELOCIDADE APARECERAM!");
+      sfxExtra.power();
+      return;
+    }
     if (ch === "?") {
       this.g().set(r, c, "X");
       p.coins++;
@@ -743,6 +774,9 @@ export class GameEngine {
       power: this.power,
       message: this.message,
       pushPct: this.revealed ? 1 : Math.min(1, this.pushFrames / 300),
+      boots: p?.boots ?? 0,
+      sonic: this.sonic,
+      ending: this.ending,
     });
   }
 
