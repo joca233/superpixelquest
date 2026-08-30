@@ -436,19 +436,33 @@ export class GameEngine {
     const jump = this.pressed(p, "jump");
     const down = this.pressed(p, "down");
 
-    if (left) {
-      p.vx -= ACCEL;
-      p.facing = -1;
-    }
-    if (right) {
-      p.vx += ACCEL;
+    const boosted = p.boots > 0;
+    const accel = boosted ? ACCEL * 1.7 : ACCEL;
+    const maxSpeed = boosted ? MAX_SPEED * 1.95 : MAX_SPEED;
+
+    if (p.autoRun) {
+      p.vx = Math.min(maxSpeed, p.vx + accel);
       p.facing = 1;
+    } else {
+      if (left) {
+        p.vx -= accel;
+        p.facing = -1;
+      }
+      if (right) {
+        p.vx += accel;
+        p.facing = 1;
+      }
+      if (!left && !right) p.vx *= FRICTION;
     }
-    if (!left && !right) p.vx *= FRICTION;
-    p.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, p.vx));
+    p.vx = Math.max(-maxSpeed, Math.min(maxSpeed, p.vx));
     if (Math.abs(p.vx) < 0.05) p.vx = 0;
 
-    if (jump && p.onGround) {
+    if (p.boots > 0) {
+      p.boots--;
+      if (p.boots === 0 && !this.sonicMode) this.showMessage("AS BOTAS PERDERAM A CARGA");
+    }
+
+    if (jump && !p.autoRun && p.onGround) {
       p.vy = p.superJump > 0 ? JUMP_V * 1.55 : JUMP_V;
       p.onGround = false;
       sfx.jump();
@@ -472,6 +486,10 @@ export class GameEngine {
     this.resolveAxis(p, "y");
 
     this.collectTiles(p);
+    this.maybeDisguiseBlocks(p);
+    this.collectBoots(p);
+    if (p.boots > 0) this.bootsEffects(p);
+    this.checkSonicFinale(p);
 
     if (p.vx !== 0 && p.onGround) p.anim = (p.anim + Math.abs(p.vx) * 0.4) % 4;
     else if (!p.onGround) p.anim = 4;
@@ -485,8 +503,10 @@ export class GameEngine {
     }
 
 
-    if (p.area === "surface" && !p.finished && p.x >= this.level.flagX - 6) {
+    const goal = this.sonicMode ? this.level.flagX + 5 * TILE : this.level.flagX - 6;
+    if (p.area === "surface" && !p.finished && p.x >= goal && (!this.sonicMode || this.sonic >= 0.99)) {
       p.finished = true;
+      p.autoRun = false;
       p.score += 1000 + this.time * 10;
       this.status = "won";
       sfx.win();
@@ -585,6 +605,123 @@ export class GameEngine {
     this.showMessage(`SALA SECRETA — ITEM: ${reward.toUpperCase()}`);
     this.spawnParticles(p.x, p.y, "#f5d442", 14);
     sfxExtra.power();
+  }
+
+
+  // ---------- speed boots ----------
+
+  /** With 8+ coins, the middle brick of any 3-brick row becomes a disguised ? block. */
+  private maybeDisguiseBlocks(p: PlayerState) {
+    if (this.disguised || p.coins < 8 || p.area !== "surface") return;
+    this.disguised = true;
+    const grid = this.level.grid;
+    let count = 0;
+    for (let r = 0; r < LEVEL_ROWS; r++) {
+      for (let c = 1; c < LEVEL_COLS - 1; c++) {
+        if (grid.get(r, c - 1) === "B" && grid.get(r, c) === "B" && grid.get(r, c + 1) === "B") {
+          grid.set(r, c, "H");
+          count++;
+          c += 2;
+        }
+      }
+    }
+    if (count > 0) this.showMessage("8 MOEDAS! ALGUM TIJOLO ESCONDE ALGO...");
+  }
+
+  private stepBoots() {
+    for (const b of this.bootsItems) {
+      if (!b.alive) continue;
+      b.vy = Math.min(MAX_FALL, b.vy + GRAVITY);
+      b.x += b.vx;
+      if (this.solidAt(b.vx > 0 ? b.x + 26 : b.x - 2, b.y + 14)) b.vx *= -1;
+      b.y += b.vy;
+      if (this.solidAt(b.x + 12, b.y + 26)) {
+        b.y = Math.floor((b.y + 26) / TILE) * TILE - 26;
+        b.vy = 0;
+      }
+      if (b.y > LEVEL_ROWS * TILE + 200) b.alive = false;
+    }
+  }
+
+  private collectBoots(p: PlayerState) {
+    if (p.area !== "surface") return;
+    for (const b of this.bootsItems) {
+      if (!b.alive) continue;
+      if (Math.abs(b.x + 12 - p.x) < 22 && Math.abs(b.y + 12 - (p.y + PH / 2)) < 26) {
+        b.alive = false;
+        p.boots = 1800;
+        this.setPower("BOTAS DE VELOCIDADE", 1800);
+        this.showMessage("BOTAS DE VELOCIDADE! CORRA E QUEBRE TUDO!");
+        this.spawnParticles(p.x, p.y, "#5fd1ff", 18);
+        sfxExtra.power();
+      }
+    }
+  }
+
+  /** While running fast: smash blocks ahead, bridge pits, and trail sparks. */
+  private bootsEffects(p: PlayerState) {
+    const fast = Math.abs(p.vx) > 4.5;
+    if (fast && Math.random() < 0.7) {
+      this.particles.push({
+        x: p.x - p.facing * 12,
+        y: p.y + PH - 6,
+        vx: -p.facing * (1 + Math.random() * 2),
+        vy: -Math.random() * 2,
+        life: 14 + Math.random() * 10,
+        color: Math.random() < 0.5 ? "#5fd1ff" : "#ffffff",
+      });
+    }
+
+    if (fast) {
+      const ahead = p.x + p.facing * (PW / 2 + 6);
+      const c = Math.floor(ahead / TILE);
+      for (let r = Math.floor(p.y / TILE); r <= Math.floor((p.y + PH - 2) / TILE); r++) {
+        const ch = this.level.grid.get(r, c);
+        if (ch === "B" || ch === "?" || ch === "H" || ch === "X") {
+          this.level.grid.set(r, c, ".");
+          p.score += 50;
+          this.spawnParticles(c * TILE + 16, r * TILE + 16, "#b45f2e", 8);
+          sfx.brick();
+        }
+      }
+    }
+
+    // instant dirt bridges over pits
+    const groundTop = LEVEL_ROWS - 2;
+    const col = Math.floor(p.x / TILE);
+    for (let c = col - 1; c <= col + 3; c++) {
+      if (c < 0 || c >= LEVEL_COLS) continue;
+      if (this.level.grid.get(groundTop, c) === ".") {
+        this.level.grid.set(groundTop, c, "G");
+        this.level.grid.set(groundTop + 1, c, "X");
+        this.spawnParticles(c * TILE + 16, groundTop * TILE, "#8b5a2b", 4);
+      }
+    }
+  }
+
+  /** Reaching the flag zone with the boots triggers the Sonic dimension ending. */
+  private checkSonicFinale(p: PlayerState) {
+    if (this.sonicMode || p.area !== "surface" || p.boots <= 0) return;
+    if (p.x < this.level.flagX - 14 * TILE) return;
+
+    this.sonicMode = true;
+    this.ending = "sonic";
+    this.sonicX = p.x;
+    p.autoRun = true;
+    p.boots = 99999;
+
+    const groundTop = LEVEL_ROWS - 2;
+    const flagCol = Math.floor(this.level.flagX / TILE);
+    for (let c = flagCol - 2; c <= flagCol + 2; c++) {
+      for (let r = groundTop - 1; r <= groundTop + 1; r++) {
+        if (this.level.grid.get(r, c) === "X" || this.level.grid.get(r, c) === "B") {
+          this.level.grid.set(r, c, ".");
+          this.spawnParticles(c * TILE + 16, r * TILE + 16, "#c1662f", 8);
+        }
+      }
+    }
+    this.showMessage("A BASE DA BANDEIRA QUEBROU — DIMENSÃO DO SONIC!");
+    sfxExtra.secret();
   }
 
   private setPower(label: string, frames: number) {
