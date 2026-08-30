@@ -936,11 +936,17 @@ export class GameEngine {
       ctx.fillRect(0, 0, W, H);
     } else {
       const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, "#3aa5f0");
-      sky.addColorStop(1, "#9fd8ff");
+      if (this.sonic > 0) {
+        sky.addColorStop(0, "#0b7bd6");
+        sky.addColorStop(1, "#7fe0ff");
+      } else {
+        sky.addColorStop(0, "#3aa5f0");
+        sky.addColorStop(1, "#9fd8ff");
+      }
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, W, H);
       this.drawClouds(W, H);
+      if (this.sonic > 0) this.drawPalms(W, H);
       this.drawHills(W, H);
     }
 
@@ -966,6 +972,19 @@ export class GameEngine {
     if (!under) {
       for (const e of this.enemies) if (e.alive) this.drawEnemy(e);
     }
+    if (!under) {
+      for (const b of this.bootsItems) {
+        if (!b.alive) continue;
+        const bob = Math.sin(performance.now() / 180) * 2;
+        ctx.fillStyle = "#5fd1ff";
+        ctx.fillRect(b.x, b.y + 10 + bob, 24, 12);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(b.x + 2, b.y + 12 + bob, 8, 4);
+        ctx.fillStyle = "#e64539";
+        ctx.fillRect(b.x, b.y + 20 + bob, 24, 4);
+      }
+    }
+
     for (const p of this.players) {
       if (!p.active) continue;
       if (p.local ? p.area !== this.viewArea() : under) continue;
@@ -1008,8 +1027,51 @@ export class GameEngine {
     }
   }
 
+  private drawPalms(W: number, H: number) {
+    const ctx = this.ctx;
+    for (let i = 0; i < 10; i++) {
+      const bx = (i * 300 - this.camX * 0.4) % (W + 400);
+      const x = bx < -200 ? bx + W + 400 : bx;
+      const base = H - TILE * 2;
+      ctx.fillStyle = "#7a4a1c";
+      ctx.fillRect(x, base - 90, 10, 90);
+      ctx.fillStyle = "#2fae5a";
+      for (let k = 0; k < 4; k++) {
+        const dir = k < 2 ? -1 : 1;
+        ctx.fillRect(x + (dir < 0 ? -46 : 8), base - 96 - (k % 2) * 12, 48, 8);
+      }
+    }
+  }
+
   private drawTile(ch: string, x: number, y: number) {
     const ctx = this.ctx;
+    const sonicTile = this.sonicMode && x < this.sonicX;
+    if (sonicTile && (ch === "G" || ch === "X")) {
+      if (ch === "G") {
+        ctx.fillStyle = "#39c04a";
+        ctx.fillRect(x, y, TILE, 12);
+        ctx.fillStyle = "#1f9c37";
+        for (let i = 0; i < TILE; i += 8) ctx.fillRect(x + i, y, 4, 12);
+      }
+      for (let r = 0; r < TILE; r += 8) {
+        for (let c = 0; c < TILE; c += 8) {
+          const odd = ((x + c) / 8 + (y + r) / 8) % 2 === 0;
+          ctx.fillStyle = odd ? "#b4761f" : "#8a5514";
+          ctx.fillRect(x + c, y + r + (ch === "G" ? 12 : 0), 8, 8);
+        }
+      }
+      return;
+    }
+    if (sonicTile && ch === "F") {
+      ctx.fillStyle = "#ffd83d";
+      ctx.fillRect(x + 8, y - 40, 16, 40);
+      ctx.fillStyle = "#1f6fe0";
+      ctx.fillRect(x + 2, y - 56, 28, 18);
+      return;
+    }
+    if (ch === "H") {
+      ch = "B";
+    }
     if (ch === "G") {
       ctx.fillStyle = "#3fbf4f";
       ctx.fillRect(x, y, TILE, 10);
@@ -1161,6 +1223,18 @@ export class GameEngine {
         const a = t * 0.6 + (i * Math.PI) / 2;
         ctx.fillStyle = "#fff3a8";
         ctx.fillRect(Math.round(x + 10 + Math.cos(a) * 20), Math.round(y + 14 + Math.sin(a) * 20), 3, 3);
+      }
+    }
+
+    // speed boots aura
+    if (p.boots > 0) {
+      const t = performance.now() / 60;
+      ctx.strokeStyle = `rgba(95,209,255,${0.5 + Math.sin(t) * 0.3})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - 4, y - 4, PW + 8, PH + 8);
+      ctx.fillStyle = "#5fd1ff";
+      for (let i = 1; i <= 3; i++) {
+        ctx.fillRect(Math.round(x - p.facing * i * 10), Math.round(y + 10 + i * 4), 8, 2);
       }
     }
 
