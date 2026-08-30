@@ -59,6 +59,9 @@ export function GameScreen({
     power: null,
     message: null,
     pushPct: 0,
+    boots: 0,
+    sonic: 0,
+    ending: "none",
   });
   const [highScore, setHighScore] = useState(0);
   const [muted, setMutedState] = useState(false);
@@ -81,6 +84,7 @@ export function GameScreen({
       onNet: sendState ?? (() => {}),
     });
     engineRef.current = engine;
+    (window as any).__pq = engine;
     registerRemote?.((snap) => engine.applyRemote(snap));
     engine.start();
     return () => {
@@ -202,6 +206,7 @@ export function GameScreen({
           <Stat label="VIDAS" value={"♥".repeat(Math.max(0, hud.lives)) || "—"} />
           <Stat label="TEMPO" value={String(hud.time).padStart(3, "0")} />
           <Stat label="RECORDE" value={String(highScore).padStart(6, "0")} />
+          {hud.boots > 0 && <Stat label="BOTAS" value="TURBO" accent />}
           {(hud.secret || hud.power) && (
             <Stat label={hud.secret ? "MODO SECRETO" : "ITEM"} value={hud.power ?? "ATIVO"} accent />
           )}
@@ -226,12 +231,32 @@ export function GameScreen({
             </div>
           )}
 
+          {hud.sonic > 0 && hud.status === "playing" && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{ background: `radial-gradient(circle at 50% 60%, transparent ${70 - hud.sonic * 40}%, rgba(15,120,220,${hud.sonic * 0.55}) 100%)` }}
+            />
+          )}
+
           {hud.status !== "playing" && (
             <div className="absolute inset-0 grid place-items-center bg-background/85 p-4 text-center">
-              <div>
+              <div className="animate-fade-in">
                 <h2 className="text-shadow-pixel font-display text-lg text-accent sm:text-2xl">
-                  {hud.status === "won" ? "FASE COMPLETA!" : "FIM DE JOGO"}
+                  {hud.status === "won"
+                    ? hud.ending === "sonic"
+                      ? "DIMENSÃO DO SONIC ALCANÇADA!"
+                      : "FASE COMPLETA!"
+                    : "FIM DE JOGO"}
                 </h2>
+                {hud.status === "won" && hud.ending === "sonic" && (
+                  <p className="mt-3 font-display text-[8px] leading-relaxed text-primary sm:text-[10px]">
+                    FINAL SECRETO · GREEN HILL ZONE
+                    <br />
+                    CRÉDITOS: SUPER PIXEL QUEST — ENGINE, ARTE E SOM PIXEL
+                    <br />
+                    OBRIGADO POR JOGAR!
+                  </p>
+                )}
                 <p className="mt-4 font-display text-[10px] text-muted-foreground">
                   PONTUAÇÃO {String(hud.score).padStart(6, "0")}
                 </p>

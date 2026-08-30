@@ -43,6 +43,9 @@ export type PlayerState = {
   area: "surface" | "under";
   room: number;
   superJump: number;
+  // speed boots power-up
+  boots: number;
+  autoRun: boolean;
   // network interpolation targets
   tx: number;
   ty: number;
@@ -63,6 +66,9 @@ export type HudState = {
   power: string | null;
   message: string | null;
   pushPct: number;
+  boots: number;
+  sonic: number;
+  ending: "none" | "sonic";
 };
 
 
@@ -131,6 +137,14 @@ export class GameEngine {
   private message: string | null = null;
   private messageTimer = 0;
 
+  // speed boots / sonic ending
+  private bootsItems: { x: number; y: number; vx: number; vy: number; alive: boolean }[] = [];
+  private disguised = false;
+  private sonicMode = false;
+  private sonicX = 0;
+  private sonic = 0;
+  private ending: "none" | "sonic" = "none";
+
   constructor(private opts: EngineOptions) {
     const ctx = opts.canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D indisponível");
@@ -163,6 +177,8 @@ export class GameEngine {
         area: "surface",
         room: 0,
         superJump: 0,
+        boots: 0,
+        autoRun: false,
         tx: spawnX + i * 26,
         ty: (LEVEL_ROWS - 3) * TILE,
       });
@@ -339,6 +355,8 @@ export class GameEngine {
       if (p.local && p.alive && p.active && p.area === "surface") this.collideEnemies(p);
     }
 
+    this.stepBoots();
+
     for (const pt of this.particles) {
       pt.x += pt.vx;
       pt.y += pt.vy;
@@ -359,6 +377,11 @@ export class GameEngine {
     if (this.messageTimer > 0) {
       this.messageTimer--;
       if (this.messageTimer === 0) this.message = null;
+    }
+
+    if (this.sonicMode) {
+      this.sonic = Math.min(1, this.sonic + 0.004);
+      this.sonicX += 26;
     }
 
     const cam = this.me() ?? this.players[0];
@@ -413,19 +436,33 @@ export class GameEngine {
     const jump = this.pressed(p, "jump");
     const down = this.pressed(p, "down");
 
-    if (left) {
-      p.vx -= ACCEL;
-      p.facing = -1;
-    }
-    if (right) {
-      p.vx += ACCEL;
+    const boosted = p.boots > 0;
+    const accel = boosted ? ACCEL * 1.7 : ACCEL;
+    const maxSpeed = boosted ? MAX_SPEED * 1.95 : MAX_SPEED;
+
+    if (p.autoRun) {
+      p.vx = Math.min(maxSpeed, p.vx + accel);
       p.facing = 1;
+    } else {
+      if (left) {
+        p.vx -= accel;
+        p.facing = -1;
+      }
+      if (right) {
+        p.vx += accel;
+        p.facing = 1;
+      }
+      if (!left && !right) p.vx *= FRICTION;
     }
-    if (!left && !right) p.vx *= FRICTION;
-    p.vx = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, p.vx));
+    p.vx = Math.max(-maxSpeed, Math.min(maxSpeed, p.vx));
     if (Math.abs(p.vx) < 0.05) p.vx = 0;
 
-    if (jump && p.onGround) {
+    if (p.boots > 0) {
+      p.boots--;
+      if (p.boots === 0 && !this.sonicMode) this.showMessage("AS BOTAS PERDERAM A CARGA");
+    }
+
+    if (jump && !p.autoRun && p.onGround) {
       p.vy = p.superJump > 0 ? JUMP_V * 1.55 : JUMP_V;
       p.onGround = false;
       sfx.jump();
@@ -449,6 +486,10 @@ export class GameEngine {
     this.resolveAxis(p, "y");
 
     this.collectTiles(p);
+    this.maybeDisguiseBlocks(p);
+    this.collectBoots(p);
+    if (p.boots > 0) this.bootsEffects(p);
+    this.checkSonicFinale(p);
 
     if (p.vx !== 0 && p.onGround) p.anim = (p.anim + Math.abs(p.vx) * 0.4) % 4;
     else if (!p.onGround) p.anim = 4;
@@ -462,8 +503,10 @@ export class GameEngine {
     }
 
 
-    if (p.area === "surface" && !p.finished && p.x >= this.level.flagX - 6) {
+    const goal = this.sonicMode ? this.level.flagX + 5 * TILE : this.level.flagX - 6;
+    if (p.area === "surface" && !p.finished && p.x >= goal && (!this.sonicMode || this.sonic >= 0.99)) {
       p.finished = true;
+      p.autoRun = false;
       p.score += 1000 + this.time * 10;
       this.status = "won";
       sfx.win();
@@ -564,6 +607,123 @@ export class GameEngine {
     sfxExtra.power();
   }
 
+
+  // ---------- speed boots ----------
+
+  /** With 8+ coins, the middle brick of any 3-brick row becomes a disguised ? block. */
+  private maybeDisguiseBlocks(p: PlayerState) {
+    if (this.disguised || p.coins < 8 || p.area !== "surface") return;
+    this.disguised = true;
+    const grid = this.level.grid;
+    let count = 0;
+    for (let r = 0; r < LEVEL_ROWS; r++) {
+      for (let c = 1; c < LEVEL_COLS - 1; c++) {
+        if (grid.get(r, c - 1) === "B" && grid.get(r, c) === "B" && grid.get(r, c + 1) === "B") {
+          grid.set(r, c, "H");
+          count++;
+          c += 2;
+        }
+      }
+    }
+    if (count > 0) this.showMessage("8 MOEDAS! ALGUM TIJOLO ESCONDE ALGO...");
+  }
+
+  private stepBoots() {
+    for (const b of this.bootsItems) {
+      if (!b.alive) continue;
+      b.vy = Math.min(MAX_FALL, b.vy + GRAVITY);
+      b.x += b.vx;
+      if (this.solidAt(b.vx > 0 ? b.x + 26 : b.x - 2, b.y + 14)) b.vx *= -1;
+      b.y += b.vy;
+      if (this.solidAt(b.x + 12, b.y + 26)) {
+        b.y = Math.floor((b.y + 26) / TILE) * TILE - 26;
+        b.vy = 0;
+      }
+      if (b.y > LEVEL_ROWS * TILE + 200) b.alive = false;
+    }
+  }
+
+  private collectBoots(p: PlayerState) {
+    if (p.area !== "surface") return;
+    for (const b of this.bootsItems) {
+      if (!b.alive) continue;
+      if (Math.abs(b.x + 12 - p.x) < 22 && Math.abs(b.y + 12 - (p.y + PH / 2)) < 26) {
+        b.alive = false;
+        p.boots = 1800;
+        this.setPower("BOTAS DE VELOCIDADE", 1800);
+        this.showMessage("BOTAS DE VELOCIDADE! CORRA E QUEBRE TUDO!");
+        this.spawnParticles(p.x, p.y, "#5fd1ff", 18);
+        sfxExtra.power();
+      }
+    }
+  }
+
+  /** While running fast: smash blocks ahead, bridge pits, and trail sparks. */
+  private bootsEffects(p: PlayerState) {
+    const fast = Math.abs(p.vx) > 4.5;
+    if (fast && Math.random() < 0.7) {
+      this.particles.push({
+        x: p.x - p.facing * 12,
+        y: p.y + PH - 6,
+        vx: -p.facing * (1 + Math.random() * 2),
+        vy: -Math.random() * 2,
+        life: 14 + Math.random() * 10,
+        color: Math.random() < 0.5 ? "#5fd1ff" : "#ffffff",
+      });
+    }
+
+    if (fast) {
+      const ahead = p.x + p.facing * (PW / 2 + 6);
+      const c = Math.floor(ahead / TILE);
+      for (let r = Math.floor(p.y / TILE); r <= Math.floor((p.y + PH - 2) / TILE); r++) {
+        const ch = this.level.grid.get(r, c);
+        if (ch === "B" || ch === "?" || ch === "H" || ch === "X") {
+          this.level.grid.set(r, c, ".");
+          p.score += 50;
+          this.spawnParticles(c * TILE + 16, r * TILE + 16, "#b45f2e", 8);
+          sfx.brick();
+        }
+      }
+    }
+
+    // instant dirt bridges over pits
+    const groundTop = LEVEL_ROWS - 2;
+    const col = Math.floor(p.x / TILE);
+    for (let c = col - 1; c <= col + 3; c++) {
+      if (c < 0 || c >= LEVEL_COLS) continue;
+      if (this.level.grid.get(groundTop, c) === ".") {
+        this.level.grid.set(groundTop, c, "G");
+        this.level.grid.set(groundTop + 1, c, "X");
+        this.spawnParticles(c * TILE + 16, groundTop * TILE, "#8b5a2b", 4);
+      }
+    }
+  }
+
+  /** Reaching the flag zone with the boots triggers the Sonic dimension ending. */
+  private checkSonicFinale(p: PlayerState) {
+    if (this.sonicMode || p.area !== "surface" || p.boots <= 0) return;
+    if (p.x < this.level.flagX - 14 * TILE) return;
+
+    this.sonicMode = true;
+    this.ending = "sonic";
+    this.sonicX = p.x;
+    p.autoRun = true;
+    p.boots = 99999;
+
+    const groundTop = LEVEL_ROWS - 2;
+    const flagCol = Math.floor(this.level.flagX / TILE);
+    for (let c = flagCol - 2; c <= flagCol + 2; c++) {
+      for (let r = groundTop - 1; r <= groundTop + 1; r++) {
+        if (this.level.grid.get(r, c) === "X" || this.level.grid.get(r, c) === "B") {
+          this.level.grid.set(r, c, ".");
+          this.spawnParticles(c * TILE + 16, r * TILE + 16, "#c1662f", 8);
+        }
+      }
+    }
+    this.showMessage("A BASE DA BANDEIRA QUEBROU — DIMENSÃO DO SONIC!");
+    sfxExtra.secret();
+  }
+
   private setPower(label: string, frames: number) {
     this.power = label;
     this.powerTimer = frames;
@@ -628,6 +788,14 @@ export class GameEngine {
   private hitBlockFromBelow(p: PlayerState, r: number, c: number) {
     const ch = this.g().get(r, c);
     const key = r * LEVEL_COLS + c;
+    if (ch === "H") {
+      this.g().set(r, c, "X");
+      this.bumps.set(key, 10);
+      this.bootsItems.push({ x: c * TILE + 4, y: r * TILE - TILE, vx: 1.4, vy: 0, alive: true });
+      this.showMessage("BOTAS DE VELOCIDADE APARECERAM!");
+      sfxExtra.power();
+      return;
+    }
     if (ch === "?") {
       this.g().set(r, c, "X");
       p.coins++;
@@ -743,6 +911,9 @@ export class GameEngine {
       power: this.power,
       message: this.message,
       pushPct: this.revealed ? 1 : Math.min(1, this.pushFrames / 300),
+      boots: p?.boots ?? 0,
+      sonic: this.sonic,
+      ending: this.ending,
     });
   }
 
@@ -765,11 +936,17 @@ export class GameEngine {
       ctx.fillRect(0, 0, W, H);
     } else {
       const sky = ctx.createLinearGradient(0, 0, 0, H);
-      sky.addColorStop(0, "#3aa5f0");
-      sky.addColorStop(1, "#9fd8ff");
+      if (this.sonic > 0) {
+        sky.addColorStop(0, "#0b7bd6");
+        sky.addColorStop(1, "#7fe0ff");
+      } else {
+        sky.addColorStop(0, "#3aa5f0");
+        sky.addColorStop(1, "#9fd8ff");
+      }
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, W, H);
       this.drawClouds(W, H);
+      if (this.sonic > 0) this.drawPalms(W, H);
       this.drawHills(W, H);
     }
 
@@ -795,6 +972,19 @@ export class GameEngine {
     if (!under) {
       for (const e of this.enemies) if (e.alive) this.drawEnemy(e);
     }
+    if (!under) {
+      for (const b of this.bootsItems) {
+        if (!b.alive) continue;
+        const bob = Math.sin(performance.now() / 180) * 2;
+        ctx.fillStyle = "#5fd1ff";
+        ctx.fillRect(b.x, b.y + 10 + bob, 24, 12);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(b.x + 2, b.y + 12 + bob, 8, 4);
+        ctx.fillStyle = "#e64539";
+        ctx.fillRect(b.x, b.y + 20 + bob, 24, 4);
+      }
+    }
+
     for (const p of this.players) {
       if (!p.active) continue;
       if (p.local ? p.area !== this.viewArea() : under) continue;
@@ -837,8 +1027,51 @@ export class GameEngine {
     }
   }
 
+  private drawPalms(W: number, H: number) {
+    const ctx = this.ctx;
+    for (let i = 0; i < 10; i++) {
+      const bx = (i * 300 - this.camX * 0.4) % (W + 400);
+      const x = bx < -200 ? bx + W + 400 : bx;
+      const base = H - TILE * 2;
+      ctx.fillStyle = "#7a4a1c";
+      ctx.fillRect(x, base - 90, 10, 90);
+      ctx.fillStyle = "#2fae5a";
+      for (let k = 0; k < 4; k++) {
+        const dir = k < 2 ? -1 : 1;
+        ctx.fillRect(x + (dir < 0 ? -46 : 8), base - 96 - (k % 2) * 12, 48, 8);
+      }
+    }
+  }
+
   private drawTile(ch: string, x: number, y: number) {
     const ctx = this.ctx;
+    const sonicTile = this.sonicMode && x < this.sonicX;
+    if (sonicTile && (ch === "G" || ch === "X")) {
+      if (ch === "G") {
+        ctx.fillStyle = "#39c04a";
+        ctx.fillRect(x, y, TILE, 12);
+        ctx.fillStyle = "#1f9c37";
+        for (let i = 0; i < TILE; i += 8) ctx.fillRect(x + i, y, 4, 12);
+      }
+      for (let r = 0; r < TILE; r += 8) {
+        for (let c = 0; c < TILE; c += 8) {
+          const odd = ((x + c) / 8 + (y + r) / 8) % 2 === 0;
+          ctx.fillStyle = odd ? "#b4761f" : "#8a5514";
+          ctx.fillRect(x + c, y + r + (ch === "G" ? 12 : 0), 8, 8);
+        }
+      }
+      return;
+    }
+    if (sonicTile && ch === "F") {
+      ctx.fillStyle = "#ffd83d";
+      ctx.fillRect(x + 8, y - 40, 16, 40);
+      ctx.fillStyle = "#1f6fe0";
+      ctx.fillRect(x + 2, y - 56, 28, 18);
+      return;
+    }
+    if (ch === "H") {
+      ch = "B";
+    }
     if (ch === "G") {
       ctx.fillStyle = "#3fbf4f";
       ctx.fillRect(x, y, TILE, 10);
@@ -990,6 +1223,18 @@ export class GameEngine {
         const a = t * 0.6 + (i * Math.PI) / 2;
         ctx.fillStyle = "#fff3a8";
         ctx.fillRect(Math.round(x + 10 + Math.cos(a) * 20), Math.round(y + 14 + Math.sin(a) * 20), 3, 3);
+      }
+    }
+
+    // speed boots aura
+    if (p.boots > 0) {
+      const t = performance.now() / 60;
+      ctx.strokeStyle = `rgba(95,209,255,${0.5 + Math.sin(t) * 0.3})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x - 4, y - 4, PW + 8, PH + 8);
+      ctx.fillStyle = "#5fd1ff";
+      for (let i = 1; i <= 3; i++) {
+        ctx.fillRect(Math.round(x - p.facing * i * 10), Math.round(y + 10 + i * 4), 8, 2);
       }
     }
 
