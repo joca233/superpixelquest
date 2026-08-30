@@ -10,7 +10,7 @@ export const LEVEL_COLS = 236;
 export const ROOM_ROWS = 16;
 export const ROOM_COLS = 30;
 
-export type TileChar = "." | "X" | "G" | "B" | "?" | "P" | "F" | "C" | "O" | "E" | "W" | "D" | "S";
+export type TileChar = "." | "X" | "G" | "B" | "?" | "P" | "F" | "C" | "O" | "E" | "W" | "D" | "S" | "H";
 
 function mulberry32(seed: number) {
   return function () {
@@ -186,6 +186,7 @@ export function isSolid(ch: TileChar): boolean {
     ch === "E" ||
     ch === "W" ||
     ch === "D" ||
-    ch === "S"
+    ch === "S" ||
+    ch === "H"
   );
 }
