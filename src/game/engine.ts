@@ -144,6 +144,10 @@ export class GameEngine {
   private sonicX = 0;
   private sonic = 0;
   private ending: "none" | "sonic" = "none";
+  private sonicMeetX = 0;
+  private talkStart = 0;
+  private finaleDone = false;
+
 
   constructor(private opts: EngineOptions) {
     const ctx = opts.canvas.getContext("2d");
@@ -503,15 +507,36 @@ export class GameEngine {
     }
 
 
-    const goal = this.sonicMode ? this.level.flagX + 5 * TILE : this.level.flagX - 6;
-    if (p.area === "surface" && !p.finished && p.x >= goal && (!this.sonicMode || this.sonic >= 0.99)) {
+    if (this.sonicMode) {
+      // Autorun until Sonic at the edge of the transformed world, then talk and exit.
+      if (p.x >= this.sonicMeetX - 60) {
+        p.autoRun = false;
+        p.vx = 0;
+        p.x = Math.min(p.x, this.sonicMeetX - 56);
+        if (!this.talkStart) {
+          this.talkStart = performance.now();
+          p.score += 1000 + this.time * 10;
+          this.saveHighScore(p.score);
+          sfx.win();
+        }
+      }
+      if (this.talkStart && !this.finaleDone && performance.now() - this.talkStart > 3400) {
+        this.finaleDone = true;
+        p.finished = true;
+        this.status = "won";
+        this.opts.onSonicEnd?.();
+      }
+      return;
+    }
+
+    if (p.area === "surface" && !p.finished && p.x >= this.level.flagX - 6) {
       p.finished = true;
-      p.autoRun = false;
       p.score += 1000 + this.time * 10;
       this.status = "won";
       sfx.win();
       this.saveHighScore(p.score);
     }
+
   }
 
   /** Invisible wall push timer, secret reveal, and pipe transitions. */
