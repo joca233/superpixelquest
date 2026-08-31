@@ -144,6 +144,10 @@ export class GameEngine {
   private sonicX = 0;
   private sonic = 0;
   private ending: "none" | "sonic" = "none";
+  private sonicMeetX = 0;
+  private talkStart = 0;
+  private finaleDone = false;
+
 
   constructor(private opts: EngineOptions) {
     const ctx = opts.canvas.getContext("2d");
