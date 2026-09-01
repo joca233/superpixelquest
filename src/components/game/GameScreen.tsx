@@ -67,8 +67,12 @@ export function GameScreen({
   const [muted, setMutedState] = useState(false);
   const [runId, setRunId] = useState(0);
 
+  const onExitRef = useRef(onExit);
+  onExitRef.current = onExit;
+
   useEffect(() => {
     const canvas = canvasRef.current;
+
     if (!canvas) return;
     canvas.width = CANVAS_W;
     canvas.height = CANVAS_H;
@@ -82,6 +86,8 @@ export function GameScreen({
       networked,
       onHud: setHud,
       onNet: sendState ?? (() => {}),
+      onSonicEnd: () => window.setTimeout(() => onExitRef.current(), 1200),
+
     });
     engineRef.current = engine;
     registerRemote?.((snap) => engine.applyRemote(snap));
