@@ -1020,10 +1020,13 @@ export class GameEngine {
       this.drawPlayer(p);
     }
 
+    if (this.sonicMode && !under) this.drawSonic();
+
     for (const pt of this.particles) {
       ctx.fillStyle = pt.color;
       ctx.fillRect(Math.round(pt.x), Math.round(pt.y), 4, 4);
     }
+
 
     ctx.restore();
   }
