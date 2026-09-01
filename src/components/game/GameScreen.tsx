@@ -67,8 +67,12 @@ export function GameScreen({
   const [muted, setMutedState] = useState(false);
   const [runId, setRunId] = useState(0);
 
+  const onExitRef = useRef(onExit);
+  onExitRef.current = onExit;
+
   useEffect(() => {
     const canvas = canvasRef.current;
+
     if (!canvas) return;
     canvas.width = CANVAS_W;
     canvas.height = CANVAS_H;
