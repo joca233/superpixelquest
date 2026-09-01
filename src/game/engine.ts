@@ -1075,7 +1075,51 @@ export class GameEngine {
     }
   }
 
+  /** Pixel-art Sonic waiting at the edge of the transformed dimension. */
+  private drawSonic() {
+    const ctx = this.ctx;
+    const x = this.sonicMeetX;
+    const y = (LEVEL_ROWS - 2) * TILE - 34;
+    const bob = Math.sin(performance.now() / 220) * 2;
+    const P = (dx: number, dy: number, w: number, h: number, color: string) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x + dx, y + dy + bob, w, h);
+    };
+    P(-2, 2, 26, 22, "#1f6fe0"); // body
+    P(16, -2, 8, 10, "#1f6fe0"); // head top
+    P(-14, 0, 18, 8, "#1f6fe0"); // spikes
+    P(-10, 8, 16, 8, "#1f6fe0");
+    P(14, 8, 12, 12, "#f2c08a"); // muzzle
+    P(20, 10, 4, 4, "#000000"); // eye
+    P(2, 6, 6, 6, "#000000"); // eye 2
+    P(0, 24, 10, 8, "#e64539"); // shoes
+    P(14, 24, 10, 8, "#e64539");
+    P(0, 30, 12, 4, "#ffffff");
+    P(14, 30, 12, 4, "#ffffff");
+
+    if (this.talkStart) {
+      const text = "Parabéns! Você completou a jornada dimensional.";
+      const text2 = "Vou terminar o jogo por aqui!";
+      ctx.font = "12px monospace";
+      const w = Math.max(ctx.measureText(text).width, ctx.measureText(text2).width) + 16;
+      const bx = x - w + 20;
+      const by = y - 56;
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.fillRect(bx, by, w, 40);
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(bx, by, w, 3);
+      ctx.fillRect(bx, by + 37, w, 3);
+      ctx.fillRect(bx, by, 3, 40);
+      ctx.fillRect(bx + w - 3, by, 3, 40);
+      ctx.fillRect(bx + w - 22, by + 40, 10, 8);
+      ctx.fillStyle = "#111827";
+      ctx.fillText(text, bx + 8, by + 17);
+      ctx.fillText(text2, bx + 8, by + 32);
+    }
+  }
+
   private drawTile(ch: string, x: number, y: number) {
+
     const ctx = this.ctx;
     const sonicTile = this.sonicMode && x < this.sonicX;
     if (sonicTile && (ch === "G" || ch === "X")) {
