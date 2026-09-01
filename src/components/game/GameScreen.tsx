@@ -82,6 +82,8 @@ export function GameScreen({
       networked,
       onHud: setHud,
       onNet: sendState ?? (() => {}),
+      onSonicEnd: () => window.setTimeout(() => onExitRef.current(), 1200),
+
     });
     engineRef.current = engine;
     registerRemote?.((snap) => engine.applyRemote(snap));
