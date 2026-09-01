@@ -103,6 +103,8 @@ export type EngineOptions = {
   networked: boolean;
   onHud: (hud: HudState) => void;
   onNet?: (snap: NetSnapshot) => void;
+  onSonicEnd?: () => void;
+
 };
 
 export class GameEngine {
