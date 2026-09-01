@@ -734,8 +734,10 @@ export class GameEngine {
     this.sonicMode = true;
     this.ending = "sonic";
     this.sonicX = p.x;
+    this.sonicMeetX = (LEVEL_COLS - 4) * TILE;
     p.autoRun = true;
     p.boots = 99999;
+
 
     const groundTop = LEVEL_ROWS - 2;
     const flagCol = Math.floor(this.level.flagX / TILE);
