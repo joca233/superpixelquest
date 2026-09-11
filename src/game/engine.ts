@@ -652,7 +652,7 @@ export class GameEngine {
         }
       }
     }
-    if (count > 0) this.showMessage("8 MOEDAS! ALGUM TIJOLO ESCONDE ALGO...");
+    // Segredo silencioso: nenhuma dica é exibida ao jogador.
   }
 
   private stepBoots() {
@@ -1098,8 +1098,8 @@ export class GameEngine {
     P(14, 30, 12, 4, "#ffffff");
 
     if (this.talkStart) {
-      const text = "Parabéns! Você completou a jornada dimensional.";
-      const text2 = "Vou terminar o jogo por aqui!";
+      const text = "Vou terminar o jogo por aqui!";
+      const text2 = "Até a próxima!";
       ctx.font = "12px monospace";
       const w = Math.max(ctx.measureText(text).width, ctx.measureText(text2).width) + 16;
       const bx = x - w + 20;
