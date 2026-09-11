@@ -3,6 +3,7 @@ import { GameEngine, PLAYER_COLORS, type ControlScheme, type HudState, type NetS
 import { sfx, setMuted, isMuted } from "@/game/audio";
 import { ChatPanel } from "@/components/game/ChatPanel";
 import type { ChatMessage } from "@/hooks/useRoom";
+import { extractAmiiboPalette, parseAmiiboCommand } from "@/game/amiibo";
 
 export type ChatApi = {
   messages: ChatMessage[];
@@ -16,6 +17,7 @@ export type ChatApi = {
 };
 
 const GOD_COMMAND = "/invencibilidade infinita";
+const AMIIBO_COMMAND = "/amiibo";
 
 type Props = {
   playerCount: number;
@@ -48,6 +50,7 @@ export function GameScreen({
 }: Props) {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const amiiboInputRef = useRef<HTMLInputElement | null>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const [hud, setHud] = useState<HudState>({
     score: 0,
@@ -131,7 +134,11 @@ export function GameScreen({
   useEffect(() => {
     if (!chat) return;
     chat.onChatMessage((m) => {
-      if (m.text.toLowerCase().startsWith(GOD_COMMAND)) {
+      const amiiboPalette = parseAmiiboCommand(m.text);
+      if (amiiboPalette) {
+        engineRef.current?.setPlayerPalette(m.slot, amiiboPalette);
+        engineRef.current?.setChatBubble(m.slot, "PALETA AMIIBO!");
+      } else if (m.text.toLowerCase().startsWith(GOD_COMMAND)) {
         engineRef.current?.setGodMode(m.slot, true);
         engineRef.current?.setChatBubble(m.slot, "✦ INVENCÍVEL ✦");
       } else {
@@ -189,8 +196,14 @@ export function GameScreen({
       return;
     }
 
+    if (lower === AMIIBO_COMMAND) {
+      setChatOpen(false);
+      amiiboInputRef.current?.click();
+      return;
+    }
+
     if (lower.startsWith("/")) {
-      api.addSystemMessage("Comando desconhecido. Tente /voicechat ou /invencibilidade infinita");
+      api.addSystemMessage("Comando desconhecido. Tente /voicechat, /amiibo ou /invencibilidade infinita");
       setChatOpen(false);
       return;
     }
@@ -200,9 +213,35 @@ export function GameScreen({
     setChatOpen(false);
   }, [draft]);
 
+  const loadAmiibo = useCallback(async (file: File | undefined) => {
+    const api = chatRef.current;
+    if (!api || !file) return;
+    try {
+      const palette = await extractAmiiboPalette(file);
+      engineRef.current?.setPlayerPalette(api.mySlot, palette);
+      engineRef.current?.setChatBubble(api.mySlot, "PALETA AMIIBO!");
+      api.sendChat(`${AMIIBO_COMMAND} ${palette.join(",")}`);
+      api.addSystemMessage("Paleta Amiibo aplicada ao seu personagem!");
+    } catch (error) {
+      api.addSystemMessage(error instanceof Error ? error.message : "Não foi possível analisar essa imagem.");
+    } finally {
+      if (amiiboInputRef.current) amiiboInputRef.current.value = "";
+    }
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-background px-2 py-3 sm:px-4 sm:py-6">
+      {chat && (
+        <input
+          ref={amiiboInputRef}
+          type="file"
+          accept="image/png,.png"
+          className="sr-only"
+          aria-label="Selecionar imagem PNG do Amiibo"
+          onChange={(event) => void loadAmiibo(event.target.files?.[0])}
+        />
+      )}
       <div className="mx-auto w-full max-w-5xl">
         {/* HUD */}
         <div className="pixel-frame mb-3 grid grid-cols-2 gap-2 rounded-sm bg-card p-3 font-display text-[9px] sm:grid-cols-5 sm:text-[10px]">
