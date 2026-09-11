@@ -13,6 +13,7 @@ import {
   type LevelData,
 } from "./level";
 import { sfx, sfxExtra } from "./audio";
+import type { PlayerPalette } from "./amiibo";
 
 
 export const PLAYER_COLORS = ["#e64539", "#3fd463", "#3a8ee6", "#f5d442"];
@@ -129,6 +130,7 @@ export class GameEngine {
   private inputLocked = false;
   private bubbles = new Map<number, { text: string; until: number }>();
   private godMode = new Set<number>();
+  private playerPalettes = new Map<number, PlayerPalette>();
 
   // secret / easter egg state
   private revealed = false;
@@ -227,6 +229,11 @@ export class GameEngine {
   setGodMode(index: number, on: boolean) {
     if (on) this.godMode.add(index);
     else this.godMode.delete(index);
+  }
+
+  /** Apply colors sampled from a local PNG through the /amiibo command. */
+  setPlayerPalette(index: number, palette: PlayerPalette) {
+    this.playerPalettes.set(index, palette);
   }
 
 
@@ -1251,7 +1258,10 @@ export class GameEngine {
     if (!p.alive && p.lives <= 0) return;
     const god = this.godMode.has(p.index);
     if (!god && p.invuln > 0 && Math.floor(p.invuln / 4) % 2 === 0) return;
-    const color = PLAYER_COLORS[p.index % 4] ?? "#e64539";
+    const palette = this.playerPalettes.get(p.index);
+    const color = palette?.[0] ?? PLAYER_COLORS[p.index % 4] ?? "#e64539";
+    const overalls = palette?.[1] ?? "#2b48b5";
+    const skin = palette?.[2] ?? "#ffc79a";
 
     const x = Math.round(p.x - PW / 2);
     const y = Math.round(p.y);
@@ -1262,17 +1272,17 @@ export class GameEngine {
     ctx.fillRect(x + 3, y, 16, 6);
     ctx.fillRect(p.facing === 1 ? x + 13 : x + 1, y + 4, 8, 3);
     // face
-    ctx.fillStyle = "#ffc79a";
+    ctx.fillStyle = skin;
     ctx.fillRect(x + 3, y + 6, 16, 9);
     ctx.fillStyle = "#241a12";
     ctx.fillRect(p.facing === 1 ? x + 13 : x + 6, y + 8, 3, 3);
     // body
     ctx.fillStyle = color;
     ctx.fillRect(x + 1, y + 15, 20, 9);
-    ctx.fillStyle = "#2b48b5";
+    ctx.fillStyle = overalls;
     ctx.fillRect(x + 4, y + 20, 14, 6);
     // legs
-    ctx.fillStyle = "#2b48b5";
+    ctx.fillStyle = overalls;
     if (!p.onGround) {
       ctx.fillRect(x + 2, y + 24, 7, 4);
       ctx.fillRect(x + 13, y + 24, 7, 4);
