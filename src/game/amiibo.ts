@@ -2,7 +2,7 @@ export type PlayerPalette = readonly [string, string, string];
 
 const toHex = (value: number) => value.toString(16).padStart(2, "0");
 
-const colorDistance = (a: readonly number[], b: readonly number[]) =>
+const colorDistance = (a: readonly [number, number, number], b: readonly [number, number, number]) =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
 export async function extractAmiiboPalette(file: File): Promise<PlayerPalette> {
@@ -26,8 +26,8 @@ export async function extractAmiiboPalette(file: File): Promise<PlayerPalette> {
   const buckets = new Map<string, { rgb: [number, number, number]; count: number }>();
 
   for (let i = 0; i < pixels.length; i += 4) {
-    if (pixels[i + 3] < 160) continue;
-    const rgb: [number, number, number] = [pixels[i], pixels[i + 1], pixels[i + 2]];
+    if ((pixels[i + 3] ?? 0) < 160) continue;
+    const rgb: [number, number, number] = [pixels[i] ?? 0, pixels[i + 1] ?? 0, pixels[i + 2] ?? 0];
     const lightness = (rgb[0] + rgb[1] + rgb[2]) / 3;
     if (lightness < 18 || lightness > 242) continue;
     const quantized = rgb.map((channel) => Math.min(224, Math.floor(channel / 32) * 32 + 16)) as [
@@ -49,12 +49,18 @@ export async function extractAmiiboPalette(file: File): Promise<PlayerPalette> {
   }
 
   const fallbacks: [number, number, number][] = [[230, 69, 57], [43, 72, 181], [255, 199, 154]];
-  while (selected.length < 3) selected.push(fallbacks[selected.length]);
-  const colors = selected.map((rgb) => `#${toHex(rgb[0])}${toHex(rgb[1])}${toHex(rgb[2])}`);
-  return [colors[0], colors[1], colors[2]];
+  while (selected.length < 3) {
+    const fallback = fallbacks[selected.length] ?? fallbacks[0];
+    selected.push(fallback ?? [230, 69, 57]);
+  }
+  const asHex = (rgb: [number, number, number]) => `#${toHex(rgb[0])}${toHex(rgb[1])}${toHex(rgb[2])}`;
+  return [asHex(selected[0] ?? fallbacks[0]), asHex(selected[1] ?? fallbacks[1]), asHex(selected[2] ?? fallbacks[2])];
 }
 
 export function parseAmiiboCommand(text: string): PlayerPalette | null {
   const match = text.match(/^\/amiibo\s+(#[0-9a-f]{6}),(#[0-9a-f]{6}),(#[0-9a-f]{6})$/i);
-  return match ? [match[1], match[2], match[3]] : null;
+  const primary = match?.[1];
+  const secondary = match?.[2];
+  const skin = match?.[3];
+  return primary && secondary && skin ? [primary, secondary, skin] : null;
 }
