@@ -54,7 +54,11 @@ export async function extractAmiiboPalette(file: File): Promise<PlayerPalette> {
     selected.push(fallback ?? [230, 69, 57]);
   }
   const asHex = (rgb: [number, number, number]) => `#${toHex(rgb[0])}${toHex(rgb[1])}${toHex(rgb[2])}`;
-  return [asHex(selected[0] ?? fallbacks[0]), asHex(selected[1] ?? fallbacks[1]), asHex(selected[2] ?? fallbacks[2])];
+  const primary = selected[0];
+  const secondary = selected[1];
+  const skin = selected[2];
+  if (!primary || !secondary || !skin) throw new Error("Não foi possível extrair as cores dessa imagem.");
+  return [asHex(primary), asHex(secondary), asHex(skin)];
 }
 
 export function parseAmiiboCommand(text: string): PlayerPalette | null {
