@@ -66,7 +66,7 @@ export function buildLevel(seed = 1337): LevelData {
 
   let col = 0;
   while (col < LEVEL_COLS) {
-    if (col > START_COL + 8 && col < LEVEL_COLS - 20 && rnd() < 0.12) {
+    if (col > START_COL + 8 && col < LEVEL_COLS - 20 && rnd() < 0.06) {
       col += 2 + Math.floor(rnd() * 2);
       continue;
     }
