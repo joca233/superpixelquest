@@ -84,6 +84,8 @@ export type NetSnapshot = {
   al: number;
   s: number;
   c: number;
+  /** Host-authoritative enemy state: [id, x, y, alive] */
+  e?: [number, number, number, number][];
 };
 
 const GRAVITY = 0.62;
@@ -250,6 +252,18 @@ export class GameEngine {
     p.alive = snap.al === 1;
     p.score = snap.s;
     p.coins = snap.c;
+
+    // Enemies are simulated by the host only; mirror them on the clients.
+    if (snap.e && !this.opts.isHost) {
+      for (const [id, ex, ey, alive] of snap.e) {
+        const en = this.enemies[id];
+        if (!en) continue;
+        en.vx = ex - en.x >= 0 ? Math.abs(en.vx) : -Math.abs(en.vx);
+        en.x += (ex - en.x) * 0.5;
+        en.y += (ey - en.y) * 0.5;
+        en.alive = alive === 1;
+      }
+    }
   }
 
   start() {
@@ -428,6 +442,13 @@ export class GameEngine {
           al: me.alive ? 1 : 0,
           s: me.score,
           c: me.coins,
+          ...(this.opts.isHost
+            ? {
+                e: this.enemies.map(
+                  (en) => [en.id, Math.round(en.x), Math.round(en.y), en.alive ? 1 : 0] as [number, number, number, number],
+                ),
+              }
+            : {}),
         });
       }
     }
