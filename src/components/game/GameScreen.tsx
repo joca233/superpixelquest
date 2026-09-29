@@ -48,6 +48,7 @@ export function GameScreen({
   chat,
   onExit,
   title,
+  startWithMaxLives = false,
 }: Props) {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
