@@ -104,6 +104,7 @@ function Index() {
         schemes={["both"]}
         onExit={backToMenu}
         title="SINGLEPLAYER · CHEGUE ATÉ A BANDEIRA"
+        startWithMaxLives={maxLives}
       />
     );
   }
@@ -117,6 +118,7 @@ function Index() {
         schemes={schemes}
         onExit={backToMenu}
         title="CO-OP LOCAL · P1 WASD+ESPAÇO · P2 SETAS+ENTER"
+        startWithMaxLives={maxLives}
       />
     );
   }
@@ -160,6 +162,7 @@ function Index() {
 
         onExit={backToMenu}
         title={`SALA ${roomCode} · VOCÊ É O JOGADOR ${slot + 1}`}
+        startWithMaxLives={maxLives}
       />
     );
   }
