@@ -227,12 +227,12 @@ export class GameEngine {
     this.bubbles.set(index, { text: text.slice(0, 48), until: performance.now() + 5000 });
   }
 
-  /** Permanent invincibility granted by the /invencibilidade infinita command. */
   setMaxLives(indices: number[]) {
     for (const p of this.players) if (indices.includes(p.index)) p.lives = 99;
     this.showMessage("CÓDIGO SECRETO — 99 VIDAS!");
   }
 
+  /** Permanent invincibility granted by the /invencibilidade infinita command. */
   setGodMode(index: number, on: boolean) {
     if (on) this.godMode.add(index);
     else this.godMode.delete(index);
