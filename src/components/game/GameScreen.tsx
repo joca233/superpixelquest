@@ -30,6 +30,7 @@ type Props = {
   chat?: ChatApi;
   onExit: () => void;
   title: string;
+  startWithMaxLives?: boolean;
 };
 
 const CANVAS_W = 960;
@@ -120,22 +121,12 @@ export function GameScreen({
     setMutedState(next);
   };
 
-  // Secret code: → ↑ ↓ ← then Space = 99 lives
+  // Secret code (typed in the main menu): start with 99 lives
   useEffect(() => {
-    const seq = ["ArrowRight", "ArrowUp", "ArrowDown", "ArrowLeft", " "];
-    let pos = 0;
-    const onKey = (e: KeyboardEvent) => {
-      const k = e.key === "Spacebar" ? " " : e.key;
-      if (k === seq[pos]) pos++;
-      else pos = k === seq[0] ? 1 : 0;
-      if (pos === seq.length) {
-        pos = 0;
-        engineRef.current?.setMaxLives(localIndices);
-        sfx.select();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    if (startWithMaxLives) {
+      engineRef.current?.setMaxLives(localIndices);
+      sfx.select();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runId]);
 
