@@ -228,6 +228,11 @@ export class GameEngine {
   }
 
   /** Permanent invincibility granted by the /invencibilidade infinita command. */
+  setMaxLives(indices: number[]) {
+    for (const p of this.players) if (indices.includes(p.index)) p.lives = 99;
+    this.showMessage("CÓDIGO SECRETO — 99 VIDAS!");
+  }
+
   setGodMode(index: number, on: boolean) {
     if (on) this.godMode.add(index);
     else this.godMode.delete(index);
@@ -654,7 +659,7 @@ export class GameEngine {
       p.score += 1000;
       this.setPower("+10 MOEDAS", 240);
     } else {
-      p.lives += 1;
+      p.lives = Math.min(99, p.lives + 1);
       this.setPower("+1 VIDA", 240);
     }
     this.showMessage(`SALA SECRETA — ITEM: ${reward.toUpperCase()}`);
