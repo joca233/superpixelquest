@@ -32,6 +32,25 @@ type Screen = "menu" | "single" | "local" | "lobby" | "net";
 function Index() {
   const [screen, setScreen] = useState<Screen>("menu");
   const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [maxLives, setMaxLives] = useState(false);
+
+  // Secret code in the main menu: → ↑ ↓ ← then Space = start with 99 lives
+  useEffect(() => {
+    if (screen !== "menu") return;
+    const seq = ["ArrowRight", "ArrowUp", "ArrowDown", "ArrowLeft", " "];
+    let pos = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key === "Spacebar" ? " " : e.key;
+      if (k === seq[pos]) pos++;
+      else pos = k === seq[0] ? 1 : 0;
+      if (pos === seq.length) {
+        pos = 0;
+        setMaxLives(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [screen]);
 
   // Join a room automatically when the URL carries ?sala=XXXX
   useEffect(() => {
@@ -85,6 +104,7 @@ function Index() {
         schemes={["both"]}
         onExit={backToMenu}
         title="SINGLEPLAYER · CHEGUE ATÉ A BANDEIRA"
+        startWithMaxLives={maxLives}
       />
     );
   }
@@ -98,6 +118,7 @@ function Index() {
         schemes={schemes}
         onExit={backToMenu}
         title="CO-OP LOCAL · P1 WASD+ESPAÇO · P2 SETAS+ENTER"
+        startWithMaxLives={maxLives}
       />
     );
   }
@@ -141,6 +162,7 @@ function Index() {
 
         onExit={backToMenu}
         title={`SALA ${roomCode} · VOCÊ É O JOGADOR ${slot + 1}`}
+        startWithMaxLives={maxLives}
       />
     );
   }
