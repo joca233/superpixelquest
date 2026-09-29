@@ -229,7 +229,6 @@ export class GameEngine {
 
   setMaxLives(indices: number[]) {
     for (const p of this.players) if (indices.includes(p.index)) p.lives = 99;
-    this.showMessage("CÓDIGO SECRETO — 99 VIDAS!");
   }
 
   /** Permanent invincibility granted by the /invencibilidade infinita command. */
