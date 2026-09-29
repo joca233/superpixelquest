@@ -34,7 +34,8 @@ function Index() {
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [maxLives, setMaxLives] = useState(false);
 
-  // Secret code in the main menu: → ↑ ↓ ← then Space = start with 99 lives
+  // Secret code in the main menu: → ↑ ↓ ← then Space = start with 99 lives.
+  // Plain Space (without the sequence) starts a singleplayer run.
   useEffect(() => {
     if (screen !== "menu") return;
     const seq = ["ArrowRight", "ArrowUp", "ArrowDown", "ArrowLeft", " "];
@@ -46,6 +47,11 @@ function Index() {
       if (pos === seq.length) {
         pos = 0;
         setMaxLives(true);
+        return;
+      }
+      if (k === " ") {
+        pos = 0;
+        setScreen("single");
       }
     };
     window.addEventListener("keydown", onKey);
