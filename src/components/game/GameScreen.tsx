@@ -120,6 +120,25 @@ export function GameScreen({
     setMutedState(next);
   };
 
+  // Secret code: → ↑ ↓ ← then Space = 99 lives
+  useEffect(() => {
+    const seq = ["ArrowRight", "ArrowUp", "ArrowDown", "ArrowLeft", " "];
+    let pos = 0;
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key === "Spacebar" ? " " : e.key;
+      if (k === seq[pos]) pos++;
+      else pos = k === seq[0] ? 1 : 0;
+      if (pos === seq.length) {
+        pos = 0;
+        engineRef.current?.setMaxLives(localIndices);
+        sfx.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runId]);
+
   /* ---------------- Chat (WiFi mode only) ---------------- */
   const [chatOpen, setChatOpen] = useState(false);
   const [draft, setDraft] = useState("");
