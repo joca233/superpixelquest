@@ -389,7 +389,7 @@ export function GameScreen({
         )}
 
         {/* Mobile touch controls */}
-        <div className="mt-4 flex items-end justify-between gap-4 md:hidden">
+        <div className="mt-4 flex items-end justify-between gap-4 md:hidden [@media(pointer:coarse)]:flex! [@media(hover:none)]:flex!" style={{ touchAction: "none" }}>
           <div className="flex gap-3">
             <TouchBtn label="◀" onDown={() => touch("left", true)} onUp={() => touch("left", false)} />
             <TouchBtn label="▶" onDown={() => touch("right", true)} onUp={() => touch("right", false)} />
@@ -448,6 +448,7 @@ function TouchBtn({
       onPointerLeave={onUp}
       onPointerCancel={onUp}
       onContextMenu={(e) => e.preventDefault()}
+      style={{ touchAction: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
       className={`pixel-btn select-none rounded-sm font-display ${
         big ? "h-20 w-20 bg-primary text-primary-foreground text-lg" : "h-16 w-16 bg-secondary text-secondary-foreground"
       }`}
