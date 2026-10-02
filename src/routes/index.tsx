@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { MainMenu } from "@/components/game/MainMenu";
 import { GameScreen } from "@/components/game/GameScreen";
 import { Lobby } from "@/components/game/Lobby";
@@ -27,32 +27,37 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Screen = "menu" | "single" | "local" | "lobby" | "net";
+type Screen = "menu" | "single" | "local" | "lobby" | "net" | "3d";
+
+const Game3D = lazy(() => import("@/components/game3d/Game3D"));
 
 function Index() {
   const [screen, setScreen] = useState<Screen>("menu");
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [maxLives, setMaxLives] = useState(false);
 
-  // Secret code in the main menu: → ↑ ↓ ← then Space = start with 99 lives.
-  // Plain Space (without the sequence) starts a singleplayer run.
+  // Secret codes in the main menu (checked against the most recent keys):
+  //  → ↑ ↓ ← Space           = 99 lives (doesn't start)
+  //  ← ↑ → ↓ ← ← ↑ ↑ → → A B Space = start the 3D world
+  // Plain Space otherwise starts a singleplayer run.
   useEffect(() => {
     if (screen !== "menu") return;
-    const seq = ["ArrowRight", "ArrowUp", "ArrowDown", "ArrowLeft", " "];
-    let pos = 0;
+    const lives = ["ArrowRight", "ArrowUp", "ArrowDown", "ArrowLeft"];
+    const threeD = ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown", "ArrowLeft", "ArrowLeft", "ArrowUp", "ArrowUp", "ArrowRight", "ArrowRight", "a", "b"];
+    let buf: string[] = [];
+    const endsWith = (s: string[]) => buf.length >= s.length && s.every((k, i) => buf[buf.length - s.length + i] === k);
     const onKey = (e: KeyboardEvent) => {
-      const k = e.key === "Spacebar" ? " " : e.key;
-      if (k === seq[pos]) pos++;
-      else pos = k === seq[0] ? 1 : 0;
-      if (pos === seq.length) {
-        pos = 0;
-        setMaxLives(true);
+      const raw = e.key === "Spacebar" ? " " : e.key;
+      const k = raw.length === 1 ? raw.toLowerCase() : raw;
+      if (k === " ") {
+        e.preventDefault();
+        if (endsWith(threeD)) setScreen("3d");
+        else if (endsWith(lives)) setMaxLives(true);
+        else setScreen("single");
+        buf = [];
         return;
       }
-      if (k === " ") {
-        pos = 0;
-        setScreen("single");
-      }
+      buf = [...buf, k].slice(-20);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -99,6 +104,14 @@ function Index() {
         onLocalCoop={() => setScreen("local")}
         onWifi={openWifi}
       />
+    );
+  }
+
+  if (screen === "3d") {
+    return (
+      <Suspense fallback={<div className="grid min-h-screen place-items-center bg-background font-display text-[10px] text-accent">CARREGANDO 3D...</div>}>
+        <Game3D onExit={backToMenu} startWithMaxLives={maxLives} />
+      </Suspense>
     );
   }
 
