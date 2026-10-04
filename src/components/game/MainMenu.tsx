@@ -5,15 +5,18 @@ type Props = {
   onSingleplayer: () => void;
   onLocalCoop: () => void;
   onWifi: () => void;
+  onSonicStage: () => void;
 };
 
-export function MainMenu({ onSingleplayer, onLocalCoop, onWifi }: Props) {
+export function MainMenu({ onSingleplayer, onLocalCoop, onWifi, onSonicStage }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [highScore, setHighScore] = useState(0);
+  const [sonicUnlocked, setSonicUnlocked] = useState(false);
 
   useEffect(() => {
     try {
       setHighScore(Number(localStorage.getItem("pixelquest_highscore") ?? "0"));
+      setSonicUnlocked(localStorage.getItem("pixelquest_sonic_unlocked") === "1");
     } catch {
       /* ignore */
     }
@@ -54,6 +57,14 @@ export function MainMenu({ onSingleplayer, onLocalCoop, onWifi }: Props) {
           >
             MULTIPLAYER
           </button>
+          {sonicUnlocked && (
+            <button
+              onClick={click(onSonicStage)}
+              className="pixel-btn rounded-sm bg-secondary px-6 py-4 text-[11px] text-secondary-foreground"
+            >
+              DIMENSÃO DO SONIC
+            </button>
+          )}
         </div>
 
         <p className="mt-10 font-display text-[8px] text-muted-foreground">

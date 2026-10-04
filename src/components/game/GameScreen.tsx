@@ -31,6 +31,7 @@ type Props = {
   onExit: () => void;
   title: string;
   startWithMaxLives?: boolean;
+  sonicStage?: boolean;
 };
 
 const CANVAS_W = 960;
@@ -49,6 +50,7 @@ export function GameScreen({
   onExit,
   title,
   startWithMaxLives = false,
+  sonicStage = false,
 }: Props) {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -91,6 +93,7 @@ export function GameScreen({
       networked,
       onHud: setHud,
       onNet: sendState ?? (() => {}),
+      sonicStage,
       onSonicEnd: () => window.setTimeout(() => onExitRef.current(), 1200),
 
     });
@@ -111,6 +114,16 @@ export function GameScreen({
       /* ignore */
     }
   }, [hud.status]);
+
+  useEffect(() => {
+    if (hud.ending === "sonic") {
+      try {
+        localStorage.setItem("pixelquest_sonic_unlocked", "1");
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [hud.ending]);
 
   const touch = (key: "left" | "right" | "jump" | "down", value: boolean) => {
     engineRef.current?.setTouch({ [key]: value });
