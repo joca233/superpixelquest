@@ -27,7 +27,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Screen = "menu" | "single" | "local" | "lobby" | "net" | "3d";
+type Screen = "menu" | "single" | "local" | "lobby" | "net" | "3d" | "sonic";
 
 const Game3D = lazy(() => import("@/components/game3d/Game3D"));
 
@@ -103,6 +103,7 @@ function Index() {
         onSingleplayer={() => setScreen("single")}
         onLocalCoop={() => setScreen("local")}
         onWifi={openWifi}
+        onSonicStage={() => setScreen("sonic")}
       />
     );
   }
@@ -112,6 +113,20 @@ function Index() {
       <Suspense fallback={<div className="grid min-h-screen place-items-center bg-background font-display text-[10px] text-accent">CARREGANDO 3D...</div>}>
         <Game3D onExit={backToMenu} startWithMaxLives={maxLives} />
       </Suspense>
+    );
+  }
+
+  if (screen === "sonic") {
+    return (
+      <GameScreen
+        playerCount={1}
+        localIndices={[0]}
+        schemes={["both"]}
+        onExit={backToMenu}
+        title="DIMENSÃO DO SONIC · BOTAS DE VELOCIDADE ATIVAS"
+        startWithMaxLives={maxLives}
+        sonicStage
+      />
     );
   }
 

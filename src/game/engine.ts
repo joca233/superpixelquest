@@ -107,6 +107,7 @@ export type EngineOptions = {
   onHud: (hud: HudState) => void;
   onNet?: (snap: NetSnapshot) => void;
   onSonicEnd?: () => void;
+  sonicStage?: boolean;
 
 };
 
@@ -194,6 +195,10 @@ export class GameEngine {
       });
     }
     this.camX = WALL_COL * TILE;
+    if (opts.sonicStage) {
+      this.sonic = 1;
+      for (const p of this.players) p.boots = 99999;
+    }
 
 
     window.addEventListener("keydown", this.onKeyDown);
@@ -495,7 +500,7 @@ export class GameEngine {
     p.vx = Math.max(-maxSpeed, Math.min(maxSpeed, p.vx));
     if (Math.abs(p.vx) < 0.05) p.vx = 0;
 
-    if (p.boots > 0) {
+    if (p.boots > 0 && !this.opts.sonicStage) {
       p.boots--;
       if (p.boots === 0 && !this.sonicMode) this.showMessage("AS BOTAS PERDERAM A CARGA");
     }
@@ -760,7 +765,7 @@ export class GameEngine {
 
   /** Reaching the flag zone with the boots triggers the Sonic dimension ending. */
   private checkSonicFinale(p: PlayerState) {
-    if (this.sonicMode || p.area !== "surface" || p.boots <= 0) return;
+    if (this.opts.sonicStage || this.sonicMode || p.area !== "surface" || p.boots <= 0) return;
     if (p.x < this.level.flagX - 14 * TILE) return;
 
     this.sonicMode = true;
@@ -1153,7 +1158,7 @@ export class GameEngine {
   private drawTile(ch: string, x: number, y: number) {
 
     const ctx = this.ctx;
-    const sonicTile = this.sonicMode && x < this.sonicX;
+    const sonicTile = !!this.opts.sonicStage || (this.sonicMode && x < this.sonicX);
     if (sonicTile && (ch === "G" || ch === "X")) {
       if (ch === "G") {
         ctx.fillStyle = "#39c04a";
