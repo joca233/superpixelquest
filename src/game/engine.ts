@@ -14,6 +14,7 @@ import {
 } from "./level";
 import { sfx, sfxExtra } from "./audio";
 import type { PlayerPalette } from "./amiibo";
+import pipeAsset from "@/assets/pipe-reference.png.asset.json";
 
 
 export const PLAYER_COLORS = ["#e64539", "#3fd463", "#3a8ee6", "#f5d442"];
@@ -129,6 +130,7 @@ export class GameEngine {
   private netAcc = 0;
   private bumps = new Map<number, number>();
   private destroyed = false;
+  private pipeImage: HTMLImageElement;
   // chat / commands
   private inputLocked = false;
   private bubbles = new Map<number, { text: string; until: number }>();
@@ -160,6 +162,8 @@ export class GameEngine {
     const ctx = opts.canvas.getContext("2d");
     if (!ctx) throw new Error("Canvas 2D indisponível");
     this.ctx = ctx;
+    this.pipeImage = new Image();
+    this.pipeImage.src = pipeAsset.url;
     this.level = buildLevel(1337);
     this.enemies = this.level.enemies.map((e, id) => ({ id, x: e.x, y: e.y, vx: 1.1, alive: true }));
 
@@ -1033,6 +1037,13 @@ export class GameEngine {
         const bump = this.bumps.get(r * LEVEL_COLS + c) ?? 0;
         const x = c * TILE;
         const y = r * TILE - (bump > 0 ? Math.sin((bump / 10) * Math.PI) * 8 : 0);
+        if (ch === "E" && this.pipeImage.complete && this.pipeImage.naturalWidth > 0) {
+          // Draw the complete reference sprite once, without seams between tiles.
+          if (grid.get(r - 1, c) !== "E" && grid.get(r, c - 1) !== "E") {
+            ctx.drawImage(this.pipeImage, x, y, TILE * 2, TILE * 2);
+          }
+          continue;
+        }
         this.drawTile(ch, x, y);
       }
     }
