@@ -138,6 +138,76 @@ export function buildLevel(seed = 1337): LevelData {
   }
   grid.set(groundTop - 1, flagCol, "F");
 
+  // Move the pit flanked by two 4-brick rows (at groundTop-4) to the middle of
+  // the level, so that gap never has to be jumped under brick rows.
+  {
+    const brickRuns: [number, number][] = [];
+    let bs = -1;
+    for (let c = START_COL; c < LEVEL_COLS; c++) {
+      const t = grid.get(groundTop - 4, c);
+      const solid = t === "B" || t === "?";
+      if (solid && bs < 0) bs = c;
+      if (!solid && bs >= 0) {
+        if (c - bs === 4) brickRuns.push([bs, c - 1]);
+        bs = -1;
+      }
+    }
+    const pits: Hole[] = [];
+    let pr = -1;
+    for (let c = START_COL; c < LEVEL_COLS; c++) {
+      const empty = grid.get(groundTop, c) === ".";
+      if (empty && pr < 0) pr = c;
+      if (!empty && pr >= 0) {
+        pits.push({ startCol: pr, endCol: c - 1 });
+        pr = -1;
+      }
+    }
+    const flanked = pits.find(
+      (p) =>
+        brickRuns.some((b) => Math.abs(b[0] - (p.endCol + 1)) <= 1) &&
+        brickRuns.some((b) => Math.abs(b[1] - p.startCol) <= 9),
+    );
+    if (flanked) {
+      const candidates = pits.filter((p) => p !== flanked);
+      if (candidates.length > 0) {
+        // Fill the pit between the brick rows with solid ground.
+        for (let c = flanked.startCol; c <= flanked.endCol; c++) {
+          grid.set(groundTop, c, "G");
+          grid.set(groundTop + 1, c, "X");
+        }
+        // Place an equivalent pit in the middle: widen the pit closest to the
+        // level's center up to 3 tiles wide.
+        const mid = Math.floor(LEVEL_COLS / 2);
+        const target = candidates.reduce((best, p) =>
+          Math.abs((p.startCol + p.endCol) / 2 - mid) <
+          Math.abs((best.startCol + best.endCol) / 2 - mid)
+            ? p
+            : best,
+        );
+        while (target.endCol - target.startCol < 2) {
+          const left = target.startCol - 1;
+          const right = target.endCol + 1;
+          const canLeft = grid.get(groundTop, left) === "G" && grid.get(groundTop - 1, left) === ".";
+          const canRight = grid.get(groundTop, right) === "G" && grid.get(groundTop - 1, right) === ".";
+          if (canLeft) {
+            grid.set(groundTop, left, ".");
+            target.startCol = left;
+          } else if (canRight) {
+            grid.set(groundTop, right, ".");
+            target.endCol = right;
+          } else break;
+        }
+        // No enemy may stand over the widened pit.
+        const x0 = target.startCol * TILE;
+        const x1 = (target.endCol + 1) * TILE - 1;
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          const e = enemies[i];
+          if (e && e.x >= x0 && e.x <= x1) enemies.splice(i, 1);
+        }
+      }
+    }
+  }
+
   // Detect pits (runs of empty ground) left to right
   const holes: Hole[] = [];
   let run = -1;
