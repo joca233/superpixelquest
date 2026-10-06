@@ -168,40 +168,41 @@ export function buildLevel(seed = 1337): LevelData {
         brickRuns.some((b) => Math.abs(b[1] - p.startCol) <= 9),
     );
     if (flanked) {
-      // Fill the pit between the brick rows with solid ground.
-      for (let c = flanked.startCol; c <= flanked.endCol; c++) {
-        grid.set(groundTop, c, "G");
-        grid.set(groundTop + 1, c, "X");
-      }
-      // Place an equivalent pit in the middle: widen the pit closest to the
-      // level's center up to 3 tiles wide.
-      const mid = Math.floor(LEVEL_COLS / 2);
-      const target = pits
-        .filter((p) => p !== flanked)
-        .reduce((best, p) =>
+      const candidates = pits.filter((p) => p !== flanked);
+      if (candidates.length > 0) {
+        // Fill the pit between the brick rows with solid ground.
+        for (let c = flanked.startCol; c <= flanked.endCol; c++) {
+          grid.set(groundTop, c, "G");
+          grid.set(groundTop + 1, c, "X");
+        }
+        // Place an equivalent pit in the middle: widen the pit closest to the
+        // level's center up to 3 tiles wide.
+        const mid = Math.floor(LEVEL_COLS / 2);
+        const target = candidates.reduce((best, p) =>
           Math.abs((p.startCol + p.endCol) / 2 - mid) <
           Math.abs((best.startCol + best.endCol) / 2 - mid)
             ? p
             : best,
         );
-      while (target.endCol - target.startCol < 2) {
-        const left = target.startCol - 1;
-        const right = target.endCol + 1;
-        const canLeft = grid.get(groundTop, left) === "G" && grid.get(groundTop - 1, left) === ".";
-        const canRight = grid.get(groundTop, right) === "G" && grid.get(groundTop - 1, right) === ".";
-        if (canLeft) {
-          grid.set(groundTop, left, ".");
-          target.startCol = left;
-        } else if (canRight) {
-          grid.set(groundTop, right, ".");
-          target.endCol = right;
-        } else break;
-      }
-      // No enemy may stand over the widened pit.
-      const x0 = target.startCol * TILE;
-      const x1 = (target.endCol + 1) * TILE - 1;
-      for (let i = enemies.length - 1; i >= 0; i--) {
-        if (enemies[i].x >= x0 && enemies[i].x <= x1) enemies.splice(i, 1);
+        while (target.endCol - target.startCol < 2) {
+          const left = target.startCol - 1;
+          const right = target.endCol + 1;
+          const canLeft = grid.get(groundTop, left) === "G" && grid.get(groundTop - 1, left) === ".";
+          const canRight = grid.get(groundTop, right) === "G" && grid.get(groundTop - 1, right) === ".";
+          if (canLeft) {
+            grid.set(groundTop, left, ".");
+            target.startCol = left;
+          } else if (canRight) {
+            grid.set(groundTop, right, ".");
+            target.endCol = right;
+          } else break;
+        }
+        // No enemy may stand over the widened pit.
+        const x0 = target.startCol * TILE;
+        const x1 = (target.endCol + 1) * TILE - 1;
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          if (enemies[i].x >= x0 && enemies[i].x <= x1) enemies.splice(i, 1);
+        }
       }
     }
   }
