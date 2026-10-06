@@ -201,7 +201,8 @@ export function buildLevel(seed = 1337): LevelData {
         const x0 = target.startCol * TILE;
         const x1 = (target.endCol + 1) * TILE - 1;
         for (let i = enemies.length - 1; i >= 0; i--) {
-          if (enemies[i].x >= x0 && enemies[i].x <= x1) enemies.splice(i, 1);
+          const e = enemies[i];
+          if (e && e.x >= x0 && e.x <= x1) enemies.splice(i, 1);
         }
       }
     }
