@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Keep former surface pit coordinates as bonus-room entrance metadata when generating replacement pipes, so secret-room indexing remains deterministic across clients.

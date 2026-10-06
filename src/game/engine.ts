@@ -608,12 +608,14 @@ export class GameEngine {
     if (down && p.onGround && p.area === "surface" && tileUnder === "O") {
       if (!this.secretMode) {
         this.secretMode = true;
-        this.showMessage("MODO SECRETO ATIVADO — OS BURACOS VIRAM SALAS!");
+        this.showMessage("MODO SECRETO ATIVADO — DESÇA NOS CANOS!");
         sfxExtra.secret();
       }
     }
 
-    if (down && p.onGround && p.area === "under" && tileUnder === "E") {
+    if (down && p.onGround && p.area === "surface" && tileUnder === "E" && this.secretMode) {
+      this.enterRoom(p);
+    } else if (down && p.onGround && p.area === "under" && tileUnder === "E") {
       this.exitRoom(p);
     }
   }
