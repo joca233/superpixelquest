@@ -10,3 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Keep former surface pit coordinates as bonus-room entrance metadata when generating replacement pipes, so secret-room indexing remains deterministic across clients.
+- Render green pipes as a single CDN-backed sprite across their tile footprint to preserve reference artwork without tile seams.
