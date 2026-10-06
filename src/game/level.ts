@@ -220,7 +220,20 @@ export function buildLevel(seed = 1337): LevelData {
     }
   }
 
-  // Underground rooms, one per pit
+  // Replace every surface pit with solid ground and a two-tile-wide green pipe.
+  // Keep the original locations as entrances to the secret bonus rooms.
+  for (const hole of holes) {
+    for (let c = hole.startCol; c <= hole.endCol; c++) {
+      grid.set(groundTop, c, "G");
+      grid.set(groundTop + 1, c, "X");
+    }
+    for (let c = hole.startCol; c < hole.startCol + 2; c++) {
+      grid.set(groundTop - 1, c, "E");
+      grid.set(groundTop - 2, c, "E");
+    }
+  }
+
+  // Underground rooms, one per former pit
   const rooms = new Grid(ROOM_ROWS, Math.max(1, holes.length) * ROOM_COLS);
   const floor = ROOM_ROWS - 2;
   for (let i = 0; i < holes.length; i++) {
