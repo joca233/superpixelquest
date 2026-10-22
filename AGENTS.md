@@ -11,3 +11,4 @@
 
 - Keep former surface pit coordinates as bonus-room entrance metadata when generating replacement pipes, so secret-room indexing remains deterministic across clients.
 - Render green pipes as a single CDN-backed sprite across their tile footprint to preserve reference artwork without tile seams.
+- Render player-one uploaded artwork with an idle sprite and a timed GIF-derived sprite sheet; keep collision dimensions and Amiibo palette rendering unchanged because artwork must not alter gameplay or customization.
