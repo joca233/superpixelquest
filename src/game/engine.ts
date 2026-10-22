@@ -15,6 +15,9 @@ import {
 import { sfx, sfxExtra } from "./audio";
 import type { PlayerPalette } from "./amiibo";
 import pipeAsset from "@/assets/pipe-reference.png.asset.json";
+import idleAsset from "@/assets/player-one-idle.png.asset.json";
+import runAsset from "@/assets/player-one-run.png.asset.json";
+import { playerSpriteFrame, RUN_FRAME_COUNT } from "./player-sprite";
 
 
 export const PLAYER_COLORS = ["#e64539", "#3fd463", "#3a8ee6", "#f5d442"];
@@ -131,6 +134,8 @@ export class GameEngine {
   private bumps = new Map<number, number>();
   private destroyed = false;
   private pipeImage: HTMLImageElement;
+  private playerIdleImage: HTMLImageElement;
+  private playerRunImage: HTMLImageElement;
   // chat / commands
   private inputLocked = false;
   private bubbles = new Map<number, { text: string; until: number }>();
@@ -164,6 +169,10 @@ export class GameEngine {
     this.ctx = ctx;
     this.pipeImage = new Image();
     this.pipeImage.src = pipeAsset.url;
+    this.playerIdleImage = new Image();
+    this.playerIdleImage.src = idleAsset.url;
+    this.playerRunImage = new Image();
+    this.playerRunImage.src = runAsset.url;
     this.level = buildLevel(1337);
     this.enemies = this.level.enemies.map((e, id) => ({ id, x: e.x, y: e.y, vx: 1.1, alive: true }));
 
@@ -256,6 +265,7 @@ export class GameEngine {
   applyRemote(snap: NetSnapshot) {
     const p = this.players[snap.i];
     if (!p || p.local) return;
+    p.vx = snap.x - p.tx;
     p.tx = snap.x;
     p.ty = snap.y;
     p.vy = snap.vy;
@@ -1310,6 +1320,18 @@ export class GameEngine {
     const y = Math.round(p.y);
     const step = Math.floor(p.anim) % 4;
 
+    const spriteFrame = playerSpriteFrame(p.index, Boolean(palette), p.vx, p.onGround, performance.now());
+    const image = spriteFrame === "idle" ? this.playerIdleImage : this.playerRunImage;
+    if (spriteFrame !== null && image.complete && image.naturalWidth > 0) {
+      const sw = image.naturalWidth / (spriteFrame === "idle" ? 1 : RUN_FRAME_COUNT);
+      const sh = image.naturalHeight;
+      const dw = Math.round(PH * sw / sh);
+      ctx.save();
+      ctx.translate(Math.round(p.x), y);
+      ctx.scale(p.facing, 1);
+      ctx.drawImage(image, typeof spriteFrame === "number" ? spriteFrame * sw : 0, 0, sw, sh, -Math.round(dw / 2), 0, dw, PH);
+      ctx.restore();
+    } else {
     // cap
     ctx.fillStyle = color;
     ctx.fillRect(x + 3, y, 16, 6);
@@ -1335,6 +1357,7 @@ export class GameEngine {
     } else {
       ctx.fillRect(x + 2, y + 26, 8, 2);
       ctx.fillRect(x + 12, y + 24, 8, 4);
+    }
     }
     // name tag for multiplayer
     if (this.players.length > 1) {
