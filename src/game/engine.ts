@@ -17,6 +17,7 @@ import type { PlayerPalette } from "./amiibo";
 import pipeAsset from "@/assets/pipe-reference.png.asset.json";
 import idleAsset from "@/assets/player-one-idle.png.asset.json";
 import runAsset from "@/assets/player-one-run.png.asset.json";
+import jumpAsset from "@/assets/player-one-jump.png.asset.json";
 import { playerSpriteFrame, RUN_FRAME_COUNT } from "./player-sprite";
 
 
@@ -135,6 +136,7 @@ export class GameEngine {
   private pipeImage: HTMLImageElement;
   private playerIdleImage: HTMLImageElement;
   private playerRunImage: HTMLImageElement;
+  private playerJumpImage: HTMLImageElement;
   // chat / commands
   private inputLocked = false;
   private bubbles = new Map<number, { text: string; until: number }>();
@@ -172,6 +174,8 @@ export class GameEngine {
     this.playerIdleImage.src = idleAsset.url;
     this.playerRunImage = new Image();
     this.playerRunImage.src = runAsset.url;
+    this.playerJumpImage = new Image();
+    this.playerJumpImage.src = jumpAsset.url;
     this.level = buildLevel(1337);
     this.enemies = this.level.enemies.map((e, id) => ({ id, x: e.x, y: e.y, vx: 1.1, alive: true }));
 
