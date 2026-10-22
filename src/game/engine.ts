@@ -65,6 +65,7 @@ func _physics_process(delta):
 	# Executa a física do movimento
 	move_and_slide()
 
+
 export type ControlScheme = "wasd" | "arrows" | "both";
 
 export type PlayerState = {
