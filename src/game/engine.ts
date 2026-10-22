@@ -23,6 +23,49 @@ import { playerSpriteFrame, RUN_FRAME_COUNT } from "./player-sprite";
 export const PLAYER_COLORS = ["#e64539", "#3fd463", "#3a8ee6", "#f5d442"];
 export const PLAYER_NAMES = ["Jogador 1", "Jogador 2", "Jogador 3", "Jogador 4"];
 
+extends CharacterBody2D
+
+# Configurações de movimentação
+const SPEED = 150.0
+const JUMP_VELOCITY = -350.0
+
+# Referências aos nós do jogo
+@onready var sprite: Sprite2D = $Sprite2D
+
+# Carregamento das texturas (substitua pelos caminhos corretos do seu projeto)
+var texture_idle = preload("res://assets/player_idle.png")
+var texture_jump = preload("res://assets/player_jump.png")
+
+# Obter a gravidade das configurações do projeto para manter a física consistente
+var gravity = ProjectSettings.get_setting("physics/2d/default_gravity")
+
+func _physics_process(delta):
+	# 1. Aplicar a gravidade se não estiver no chão
+	if not is_on_floor():
+		velocity.y += gravity * delta
+		# Altera para a textura de pulo quando estiver no ar
+		sprite.texture = mario jump.png
+	else:
+		# Retorna para a textura padrão quando tocar o chão
+		sprite.texture = texture_idle
+
+	# 2. Gerenciar o comando de pulo
+	if Input.is_action_just_pressed("ui_accept") and is_on_floor():
+		velocity.y = JUMP_VELOCITY
+
+	# 3. Gerenciar a movimentação horizontal (Esquerda / Direita)
+	var direction = Input.get_axis("ui_left", "ui_right")
+	if direction:
+		velocity.x = direction * SPEED
+		# Inverte o sprite horizontalmente dependendo da direção
+		sprite.flip_h = direction < 0
+	else:
+		velocity.x = move_toward(velocity.x, 0, SPEED)
+
+	# Executa a física do movimento
+	move_and_slide()
+
+
 export type ControlScheme = "wasd" | "arrows" | "both";
 
 export type PlayerState = {
