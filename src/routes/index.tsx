@@ -15,7 +15,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Jogue Super Pixel Quest: plataforma 2D em pixel art com pulo preciso, moedas, inimigos, co-op no teclado e multiplayer para até 4 amigos por link.",
+          "Jogue Super Pixel Quest: plataforma 2D em pixel art com pulo preciso, moedas, inimigos, cooperação no teclado e multiplayer para até 4 amigos por link.",
       },
       { property: "og:title", content: "Super Pixel Quest — Plataforma 2D Retrô Online" },
       { property: "og:type", content: "website" },
