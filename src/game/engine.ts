@@ -17,6 +17,7 @@ import type { PlayerPalette } from "./amiibo";
 import pipeAsset from "@/assets/pipe-reference.png.asset.json";
 import idleAsset from "@/assets/player-one-idle.png.asset.json";
 import runAsset from "@/assets/player-one-run.png.asset.json";
+import jumpAsset from "@/assets/player-one-jump.png.asset.json";
 import { playerSpriteFrame, RUN_FRAME_COUNT } from "./player-sprite";
 
 
