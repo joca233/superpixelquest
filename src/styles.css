@@ -159,3 +159,9 @@
 @utility animate-floaty {
   animation: floaty 2.4s steps(8, end) infinite;
 }
+
+#lovable-badge {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
